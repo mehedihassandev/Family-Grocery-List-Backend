@@ -37,7 +37,8 @@ def initialize_firebase() -> None:
                 credential = credentials.Certificate(cert_dict)
             except Exception as err:
                 raise ValueError(
-                    "Invalid FIREBASE_SERVICE_ACCOUNT_JSON format. Expected file path, JSON string, or Base64 string."
+                    "Invalid FIREBASE_SERVICE_ACCOUNT_JSON format. "
+                    "Expected file path, JSON string, or Base64 string."
                 ) from err
     else:
         # GCP Cloud Run / App Engine / Application Default Credentials (Option 2)

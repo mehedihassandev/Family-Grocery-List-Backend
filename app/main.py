@@ -5,8 +5,10 @@ from pathlib import Path
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from google.auth.exceptions import DefaultCredentialsError
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -26,6 +28,32 @@ if allowed_origins:
     )
 
 app.include_router(api_router)
+
+
+@app.exception_handler(DefaultCredentialsError)
+def default_credentials_error_handler(
+    request: Request, exc: DefaultCredentialsError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Firebase service account credentials are not configured on Render. "
+            "Please set FIREBASE_SERVICE_ACCOUNT_JSON environment variable on Render."
+        },
+    )
+
+
+@app.exception_handler(ValueError)
+def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    if "FIREBASE_SERVICE_ACCOUNT_JSON" in str(exc):
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+        )
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
 
 
 @app.get("/")

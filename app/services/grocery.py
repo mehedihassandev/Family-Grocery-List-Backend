@@ -115,11 +115,18 @@ def delete_grocery_item(item_id: str) -> bool:
 def seed_family_grocery_items(family_id: str) -> list[GroceryItem]:
     sample_items = [
         CreateGroceryItemRequest(
-            name="Whole Milk (1 Gallon)",
+            name="Organic Whole Milk",
             category="Dairy",
             priority="Urgent",
-            quantity="2 bottles",
-            notes="Buy organic if available",
+            quantity="2 gallons",
+            notes="Prefer organic brand",
+        ),
+        CreateGroceryItemRequest(
+            name="Organic Bananas",
+            category="Produce",
+            priority="Medium",
+            quantity="1 bunch",
+            notes="Slightly green",
         ),
         CreateGroceryItemRequest(
             name="Organic Eggs (Large)",
@@ -127,13 +134,6 @@ def seed_family_grocery_items(family_id: str) -> list[GroceryItem]:
             priority="Urgent",
             quantity="1 dozen",
             notes="Check expiration date",
-        ),
-        CreateGroceryItemRequest(
-            name="Fresh Honeycrisp Apples",
-            category="Produce",
-            priority="Medium",
-            quantity="6 pcs",
-            notes="For snacks",
         ),
         CreateGroceryItemRequest(
             name="Whole Wheat Bread",

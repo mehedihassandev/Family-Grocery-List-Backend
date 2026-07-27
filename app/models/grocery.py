@@ -15,7 +15,7 @@ class GroceryItem(BaseModel):
     familyId: str
     name: str = ""
     category: str = "Other"
-    priority: Literal["Urgent", "Medium", "Low"] = "Medium"
+    priority: Literal["Urgent", "High", "Medium", "Low"] = "Medium"
     quantity: str | None = None
     notes: str | None = None
     status: Literal["pending", "completed"] = "pending"
@@ -35,13 +35,13 @@ class GrocerySummary(BaseModel):
     completedItems: int
     urgentItems: int
     categoryTotals: dict[str, int]
-    updatedAt: datetime
+    updatedAt: datetime | str | None = None
 
 
 class CreateGroceryItemRequest(BaseModel):
     name: str
     category: str = "Other"
-    priority: Literal["Urgent", "Medium", "Low"] = "Medium"
+    priority: Literal["Urgent", "High", "Medium", "Low"] = "Medium"
     quantity: str | None = None
     notes: str | None = None
 
@@ -49,8 +49,9 @@ class CreateGroceryItemRequest(BaseModel):
 class UpdateGroceryItemRequest(BaseModel):
     name: str | None = None
     category: str | None = None
-    priority: Literal["Urgent", "Medium", "Low"] | None = None
+    priority: Literal["Urgent", "High", "Medium", "Low"] | None = None
     quantity: str | None = None
     notes: str | None = None
     status: Literal["pending", "completed"] | None = None
+
 

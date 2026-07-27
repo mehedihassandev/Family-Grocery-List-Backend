@@ -38,6 +38,11 @@ def ensure_family_access(family_id: str, current_user: dict[str, Any]) -> None:
     if settings.allow_dev_bypass and current_user.get("uid") == "dev-user-id":
         return
 
+    # Check directly from custom token claims if present
+    token_family_id = current_user.get("familyId") or current_user.get("family_id")
+    if token_family_id == family_id:
+        return
+
     uid = current_user.get("uid")
     if not isinstance(uid, str) or not uid:
         raise HTTPException(
@@ -53,9 +58,11 @@ def ensure_family_access(family_id: str, current_user: dict[str, Any]) -> None:
         )
 
     user_data = user_snapshot.to_dict() or {}
-    if user_data.get("familyId") != family_id:
+    user_family_id = user_data.get("familyId") or user_data.get("family_id")
+    if user_family_id != family_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User does not belong to this family.",
         )
+
 
