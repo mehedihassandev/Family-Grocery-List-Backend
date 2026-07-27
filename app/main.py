@@ -67,6 +67,15 @@ def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     )
 
 
+@app.exception_handler(Exception)
+def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Backend Error ({type(exc).__name__}): {str(exc)}"},
+    )
+
+
+
 @app.get("/")
 def root() -> dict[str, str]:
     return {"status": "ok", "service": settings.data_api_title}
