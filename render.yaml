@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: family-grocery-data-api
+    runtime: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: FIREBASE_PROJECT_ID
+        value: family-grocery-list-118d2
+      - key: ALLOW_DEV_BYPASS
+        value: "true"

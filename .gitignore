@@ -1,0 +1,18 @@
+# Environment & Virtualenv
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Cache / Egg
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
