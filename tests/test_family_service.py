@@ -144,6 +144,28 @@ def test_get_family_service(mock_fs: MagicMock) -> None:
 
 
 @patch("app.services.family.get_firestore_client")
+def test_get_family_service_datetime_with_nanoseconds(mock_fs: MagicMock) -> None:
+    from datetime import timezone
+    from google.api_core.datetime_helpers import DatetimeWithNanoseconds
+
+    fam_doc = MagicMock()
+    fam_doc.exists = True
+    fam_doc.to_dict.return_value = {
+        "id": "fam_123",
+        "name": "Smith Family",
+        "inviteCode": "K9X2M4",
+        "ownerId": "user_abc",
+        "createdAt": DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=timezone.utc),
+    }
+    mock_fs.return_value.collection.return_value.document.return_value.get.return_value = fam_doc
+
+    family = get_family_service("fam_123")
+    assert family is not None
+    assert family.id == "fam_123"
+    assert family.createdAt == "2026-07-27T16:20:00Z"
+
+
+@patch("app.services.family.get_firestore_client")
 def test_get_family_members_service(mock_fs: MagicMock) -> None:
     u1 = MagicMock()
     u1.id = "u1"

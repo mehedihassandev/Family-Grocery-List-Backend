@@ -231,3 +231,31 @@ def test_ensure_family_access_forbidden(
         ensure_family_access("target-family", {"uid": "user-123"})
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "User does not belong to this family."
+
+
+def test_grocery_item_datetime_fields() -> None:
+    from datetime import timezone
+    from google.api_core.datetime_helpers import DatetimeWithNanoseconds
+
+    dt = DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=timezone.utc)
+    item = GroceryItem(
+        id="item-123",
+        familyId="fam-123",
+        createdAt=dt,
+        updatedAt=dt,
+        completedAt=None,
+    )
+    assert item.createdAt == "2026-07-27T16:20:00Z"
+    assert item.updatedAt == "2026-07-27T16:20:00Z"
+    assert item.completedAt is None
+
+    summary = GrocerySummary(
+        familyId="fam-123",
+        totalItems=1,
+        pendingItems=1,
+        completedItems=0,
+        urgentItems=0,
+        categoryTotals={},
+        updatedAt=dt,
+    )
+    assert summary.updatedAt == "2026-07-27T16:20:00Z"

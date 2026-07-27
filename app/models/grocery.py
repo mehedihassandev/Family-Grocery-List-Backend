@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from app.models.family import format_datetime
 
 
 class GroceryActor(BaseModel):
@@ -25,6 +27,11 @@ class GroceryItem(BaseModel):
     updatedAt: Any | None = None
     completedAt: Any | None = None
 
+    @field_validator("createdAt", "updatedAt", "completedAt", mode="before")
+    @classmethod
+    def parse_datetime_fields(cls, v: Any) -> Any:
+        return format_datetime(v)
+
     model_config = ConfigDict(extra="allow")
 
 
@@ -36,6 +43,11 @@ class GrocerySummary(BaseModel):
     urgentItems: int
     categoryTotals: dict[str, int]
     updatedAt: datetime | str | None = None
+
+    @field_validator("updatedAt", mode="before")
+    @classmethod
+    def parse_updated_at(cls, v: Any) -> Any:
+        return format_datetime(v)
 
 
 class CreateGroceryItemRequest(BaseModel):
