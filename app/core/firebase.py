@@ -34,10 +34,14 @@ def initialize_firebase() -> None:
                 else:
                     decoded = base64.b64decode(service_account_input).decode("utf-8")
                     cert_dict = json.loads(decoded)
+
+                if isinstance(cert_dict, dict) and "private_key" in cert_dict:
+                    cert_dict["private_key"] = cert_dict["private_key"].replace("\\n", "\n")
+
                 credential = credentials.Certificate(cert_dict)
             except Exception as err:
                 raise ValueError(
-                    "Invalid FIREBASE_SERVICE_ACCOUNT_JSON format. "
+                    f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON format: {err}. "
                     "Expected file path, JSON string, or Base64 string."
                 ) from err
     else:

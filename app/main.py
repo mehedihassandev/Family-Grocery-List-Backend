@@ -8,6 +8,7 @@ if __name__ == "__main__" and __package__ is None:
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from google.api_core.exceptions import GoogleAPICallError
 from google.auth.exceptions import DefaultCredentialsError
 
 from app.api.router import api_router
@@ -40,6 +41,16 @@ def default_credentials_error_handler(
             "detail": "Firebase service account credentials are not configured on Render. "
             "Please set FIREBASE_SERVICE_ACCOUNT_JSON environment variable on Render."
         },
+    )
+
+
+@app.exception_handler(GoogleAPICallError)
+def google_api_error_handler(
+    request: Request, exc: GoogleAPICallError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Firestore API Error: {exc.message}"},
     )
 
 
