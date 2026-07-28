@@ -66,14 +66,26 @@ class SplitStoreGroup(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class StoreSplitItemAllocation(BaseModel):
+    itemName: str
+    bestStoreName: str
+    priceBDT: float
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class SplitBasketOptimizationResponse(BaseModel):
     familyId: str
     totalItemsCount: int
     singleStoreCheapestName: str | None = None
     singleStoreCheapestBDT: float | None = None
     splitStoreTotalBDT: float | None = None
+    splitTotalBDT: float | None = None
     additionalSavingsBDT: float | None = None
-    splitStrategy: list[SplitStoreGroup]
+    extraSplitSavingsBDT: float | None = None
+    splitStrategy: list[SplitStoreGroup] = []
+    itemAllocations: list[StoreSplitItemAllocation] = []
+    storeBreakdown: dict[str, int] = {}
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -88,6 +100,7 @@ class PriceAlertCreateRequest(BaseModel):
 
 
 class PriceAlertResponse(BaseModel):
+    id: str | None = None
     alertId: str
     familyId: str
     query: str

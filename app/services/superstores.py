@@ -15,6 +15,7 @@ from app.models.superstores import (
     SplitBasketOptimizationResponse,
     SplitStoreGroup,
     StorePriceItem,
+    StoreSplitItemAllocation,
     StoreTotalSummary,
     SuperstoreSearchResponse,
 )
@@ -678,6 +679,9 @@ def optimize_split_basket_cost(
         store["name"]: store["url"] for store in STORES
     }
 
+    item_allocations: list[StoreSplitItemAllocation] = []
+    store_breakdown: dict[str, int] = {store["name"]: 0 for store in STORES}
+
     for item_query in items:
         search_res = search_superstore_prices(item_query)
         available_items = [
@@ -686,6 +690,16 @@ def optimize_split_basket_cost(
         if available_items:
             best_item = min(available_items, key=lambda x: x.priceBDT)
             store_groups[best_item.storeName].append(best_item)
+            item_allocations.append(
+                StoreSplitItemAllocation(
+                    itemName=item_query,
+                    bestStoreName=best_item.storeName,
+                    priceBDT=best_item.priceBDT,
+                )
+            )
+            store_breakdown[best_item.storeName] = (
+                store_breakdown.get(best_item.storeName, 0) + 1
+            )
 
     split_strategy: list[SplitStoreGroup] = []
     split_total = 0.0
@@ -716,8 +730,12 @@ def optimize_split_basket_cost(
         singleStoreCheapestName=single_cheapest_name,
         singleStoreCheapestBDT=single_cheapest_bdt,
         splitStoreTotalBDT=split_total if split_strategy else None,
+        splitTotalBDT=split_total if split_strategy else None,
         additionalSavingsBDT=additional_savings,
+        extraSplitSavingsBDT=additional_savings,
         splitStrategy=split_strategy,
+        itemAllocations=item_allocations,
+        storeBreakdown=store_breakdown,
     )
 
 
@@ -736,6 +754,7 @@ def create_price_alert(payload: PriceAlertCreateRequest) -> PriceAlertResponse:
     is_triggered = best_price is not None and best_price <= payload.targetPriceBDT
 
     alert_data = {
+        "id": alert_id,
         "alertId": alert_id,
         "familyId": payload.familyId,
         "query": payload.query.strip(),

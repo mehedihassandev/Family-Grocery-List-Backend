@@ -20,7 +20,7 @@ class User(BaseModel):
     displayName: str
     photoURL: str | None = None
     familyId: str | None = None
-    role: Literal["owner", "member"] | None = None
+    role: Literal["owner", "member", "admin"] | None = None
 
     model_config = ConfigDict(extra="allow")
 
@@ -53,7 +53,7 @@ class InviteMemberRequest(BaseModel):
 
 
 class UpdateMemberRoleRequest(BaseModel):
-    role: Literal["owner", "member"]
+    role: Literal["owner", "member", "admin"]
 
 
 class MessageResponse(BaseModel):
