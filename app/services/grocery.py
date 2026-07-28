@@ -60,7 +60,26 @@ def create_grocery_item(
         "completedAt": None,
     }
     doc_ref.set(data)
-    return GroceryItem.model_validate(data)
+    item = GroceryItem.model_validate(data)
+
+    if added_by and added_by.uid:
+        try:
+            from app.services.notification import create_and_send_family_notification
+            actor_name = added_by.name or "A family member"
+            create_and_send_family_notification(
+                family_id=family_id,
+                actor_uid=added_by.uid,
+                actor_name=actor_name,
+                title="New Grocery Item Added",
+                body=f"{actor_name} added '{payload.name}' to the grocery list.",
+                event_type="ITEM_ADDED",
+                data={"familyId": family_id, "itemId": item.id, "action": "ITEM_ADDED"},
+            )
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning("Failed to send notification: %s", err)
+
+    return item
 
 
 def update_grocery_item(
@@ -100,7 +119,26 @@ def update_grocery_item(
     doc_ref.update(updates)
     existing.update(updates)
     existing.setdefault("id", item_id)
-    return GroceryItem.model_validate(existing)
+    updated_item = GroceryItem.model_validate(existing)
+
+    if payload.status == "completed" and completed_by and completed_by.uid:
+        try:
+            from app.services.notification import create_and_send_family_notification
+            actor_name = completed_by.name or "A family member"
+            create_and_send_family_notification(
+                family_id=updated_item.familyId,
+                actor_uid=completed_by.uid,
+                actor_name=actor_name,
+                title="Grocery Item Completed",
+                body=f"{actor_name} marked '{updated_item.name}' as completed.",
+                event_type="ITEM_COMPLETED",
+                data={"familyId": updated_item.familyId, "itemId": item_id, "action": "ITEM_COMPLETED"},
+            )
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning("Failed to send completion notification: %s", err)
+
+    return updated_item
 
 
 def delete_grocery_item(item_id: str) -> bool:
