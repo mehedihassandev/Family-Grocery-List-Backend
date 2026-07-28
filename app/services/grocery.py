@@ -132,7 +132,11 @@ def update_grocery_item(
                 title="Grocery Item Completed",
                 body=f"{actor_name} marked '{updated_item.name}' as completed.",
                 event_type="ITEM_COMPLETED",
-                data={"familyId": updated_item.familyId, "itemId": item_id, "action": "ITEM_COMPLETED"},
+                data={
+                    "familyId": updated_item.familyId,
+                    "itemId": item_id,
+                    "action": "ITEM_COMPLETED",
+                },
             )
         except Exception as err:
             import logging
