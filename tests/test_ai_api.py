@@ -18,10 +18,27 @@ def test_recipe_to_grocery_known_recipe() -> None:
     assert data["recipeName"] == "Beef Tehari"
     assert data["servings"] == 6
     assert len(data["ingredients"]) == 4
-    
+
     ingredient_names = [i["name"] for i in data["ingredients"]]
     assert "Kataribhog Rice" in ingredient_names
     assert "Beef" in ingredient_names
+
+
+def test_recipe_to_grocery_beef_kala_bhuna() -> None:
+    payload = {
+        "recipePrompt": "Beef Kala Bhuna with Kataribhog Rice for 4 people",
+        "servings": 4,
+    }
+    response = client.post("/v1/ai/recipe-to-grocery", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["recipeName"] == "Beef Kala Bhuna"
+    assert data["servings"] == 4
+    assert len(data["ingredients"]) == 2
+    ingredient_names = [i["name"] for i in data["ingredients"]]
+    assert "Beef" in ingredient_names
+    assert "Rice (Kataribhog)" in ingredient_names
+
 
 
 def test_recipe_to_grocery_custom_recipe() -> None:

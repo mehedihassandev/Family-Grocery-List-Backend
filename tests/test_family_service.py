@@ -8,9 +8,11 @@ from app.services.family import (
     get_family_members_service,
     get_family_service,
     get_or_create_user_profile,
+    invite_family_member_service,
     join_family_service,
     leave_family_service,
     remove_family_member_service,
+    update_member_role_service,
 )
 
 
@@ -220,3 +222,41 @@ def test_remove_family_member_service_permission_denied(mock_fs: MagicMock) -> N
 
     with pytest.raises(PermissionError, match="Only family owner can remove members."):
         remove_family_member_service({"uid": "non_owner"}, "fam_123", "target_user")
+
+
+@patch("app.services.family.get_firestore_client")
+def test_invite_family_member_service_success(mock_fs: MagicMock) -> None:
+    fam_doc = MagicMock()
+    fam_doc.exists = True
+    mock_fs.return_value.collection.return_value.document.return_value.get.return_value = fam_doc
+
+    invite_family_member_service({"uid": "inviter"}, "fam_123", "newuser@example.com")
+    mock_fs.return_value.collection.return_value.add.assert_called_once()
+
+
+@patch("app.services.family.get_firestore_client")
+def test_update_member_role_service_success(mock_fs: MagicMock) -> None:
+    fam_doc = MagicMock()
+    fam_doc.exists = True
+    fam_doc.to_dict.return_value = {"ownerId": "owner_1"}
+
+    target_doc = MagicMock()
+    target_doc.exists = True
+    target_doc.to_dict.return_value = {"familyId": "fam_123", "role": "member"}
+
+    db = mock_fs.return_value
+    target_ref = MagicMock()
+    target_ref.get.return_value = target_doc
+
+    def doc_side_effect(path: str) -> MagicMock:
+        if path == "fam_123":
+            fam_ref = MagicMock()
+            fam_ref.get.return_value = fam_doc
+            return fam_ref
+        return target_ref
+
+    db.collection.return_value.document.side_effect = doc_side_effect
+
+    update_member_role_service({"uid": "owner_1"}, "fam_123", "target_user", "owner")
+    target_ref.update.assert_called_with({"role": "owner"})
+

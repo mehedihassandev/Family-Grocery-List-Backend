@@ -205,3 +205,52 @@ def remove_family_member_service(
         raise KeyError("Member does not belong to this family.")
 
     target_ref.update({"familyId": None, "role": None})
+
+
+def invite_family_member_service(
+    current_user: dict[str, Any], family_id: str, email: str
+) -> None:
+    db = get_firestore_client()
+    family_doc = db.collection("families").document(family_id).get()
+    if not family_doc.exists:
+        raise KeyError("Family not found.")
+
+    clean_email = email.strip().lower()
+    invitation_data = {
+        "familyId": family_id,
+        "email": clean_email,
+        "invitedBy": current_user.get("uid"),
+        "createdAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": "pending",
+    }
+    db.collection("invitations").add(invitation_data)
+
+
+def update_member_role_service(
+    current_user: dict[str, Any], family_id: str, target_user_id: str, new_role: str
+) -> None:
+    uid = current_user.get("uid", "")
+    db = get_firestore_client()
+
+    family_ref = db.collection("families").document(family_id)
+    family_doc = family_ref.get()
+    if not family_doc.exists:
+        raise KeyError("Family not found.")
+
+    family_data = family_doc.to_dict() or {}
+    if family_data.get("ownerId") != uid:
+        raise PermissionError("Only family owner can update member roles.")
+
+    target_ref = db.collection("users").document(target_user_id)
+    target_doc = target_ref.get()
+    if not target_doc.exists:
+        raise KeyError("Member not found.")
+
+    target_data = target_doc.to_dict() or {}
+    if target_data.get("familyId") != family_id:
+        raise KeyError("Member does not belong to this family.")
+
+    target_ref.update({"role": new_role})
+    if new_role == "owner" and target_user_id != uid:
+        family_ref.update({"ownerId": target_user_id})
+

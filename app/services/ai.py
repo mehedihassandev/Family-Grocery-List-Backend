@@ -123,7 +123,48 @@ KNOWN_RECIPES: dict[str, dict] = {
             },
         ],
     },
+    "beef kala bhuna": {
+        "recipeName": "Beef Kala Bhuna",
+        "base_servings": 4,
+        "ingredients": [
+            {
+                "name": "Beef",
+                "category": "Meat",
+                "base_qty": 1.0,
+                "unit": "kg",
+                "unit_price": 780.00,
+            },
+            {
+                "name": "Rice (Kataribhog)",
+                "category": "Staples",
+                "base_qty": 1.0,
+                "unit": "kg",
+                "unit_price": 95.00,
+            },
+        ],
+    },
+    "kala bhuna": {
+        "recipeName": "Beef Kala Bhuna",
+        "base_servings": 4,
+        "ingredients": [
+            {
+                "name": "Beef",
+                "category": "Meat",
+                "base_qty": 1.0,
+                "unit": "kg",
+                "unit_price": 780.00,
+            },
+            {
+                "name": "Rice (Kataribhog)",
+                "category": "Staples",
+                "base_qty": 1.0,
+                "unit": "kg",
+                "unit_price": 95.00,
+            },
+        ],
+    },
 }
+
 
 
 def _extract_servings_from_prompt(prompt: str, default_servings: int) -> int:

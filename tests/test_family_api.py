@@ -203,3 +203,70 @@ def test_remove_family_member_api_not_found(
     response = client.delete("/v1/families/fam_12345/members/nonexistent")
     assert response.status_code == 404
     assert response.json()["detail"] == "Member not found."
+
+
+@patch("app.api.routes.family.invite_family_member_service")
+@patch("app.api.routes.family.ensure_family_access")
+def test_invite_family_member_api_success(
+    mock_access: MagicMock, mock_invite: MagicMock
+) -> None:
+    payload = {"email": "user@example.com"}
+    response = client.post("/v1/families/fam_12345/members", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"message": "Invitation sent successfully."}
+
+
+@patch("app.api.routes.family.invite_family_member_service")
+@patch("app.api.routes.family.ensure_family_access")
+def test_invite_family_member_api_not_found(
+    mock_access: MagicMock, mock_invite: MagicMock
+) -> None:
+    mock_invite.side_effect = KeyError("Family not found.")
+    payload = {"email": "user@example.com"}
+    response = client.post("/v1/families/nonexistent/members", json=payload)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Family not found."
+
+
+@patch("app.api.routes.family.update_member_role_service")
+@patch("app.api.routes.family.ensure_family_access")
+def test_update_member_role_api_success(
+    mock_access: MagicMock, mock_update_role: MagicMock
+) -> None:
+    payload = {"role": "owner"}
+    response = client.patch(
+        "/v1/families/fam_12345/members/user_xyz/role", json=payload
+    )
+    assert response.status_code == 200
+    assert response.json() == {"message": "Member role updated successfully."}
+
+
+@patch("app.api.routes.family.update_member_role_service")
+@patch("app.api.routes.family.ensure_family_access")
+def test_update_member_role_api_forbidden(
+    mock_access: MagicMock, mock_update_role: MagicMock
+) -> None:
+    mock_update_role.side_effect = PermissionError(
+        "Only family owner can update member roles."
+    )
+    payload = {"role": "owner"}
+    response = client.patch(
+        "/v1/families/fam_12345/members/user_xyz/role", json=payload
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Only family owner can update member roles."
+
+
+@patch("app.api.routes.family.update_member_role_service")
+@patch("app.api.routes.family.ensure_family_access")
+def test_update_member_role_api_not_found(
+    mock_access: MagicMock, mock_update_role: MagicMock
+) -> None:
+    mock_update_role.side_effect = KeyError("Member not found.")
+    payload = {"role": "member"}
+    response = client.patch(
+        "/v1/families/fam_12345/members/nonexistent/role", json=payload
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Member not found."
+

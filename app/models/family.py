@@ -48,5 +48,14 @@ class JoinFamilyRequest(BaseModel):
     inviteCode: str
 
 
+class InviteMemberRequest(BaseModel):
+    email: str
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    role: Literal["owner", "member"]
+
+
 class MessageResponse(BaseModel):
     message: str
+
