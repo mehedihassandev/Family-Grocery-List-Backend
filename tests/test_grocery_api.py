@@ -1,3 +1,4 @@
+from datetime import UTC
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -234,10 +235,9 @@ def test_ensure_family_access_forbidden(
 
 
 def test_grocery_item_datetime_fields() -> None:
-    from datetime import timezone
     from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
-    dt = DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=timezone.utc)
+    dt = DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=UTC)
     item = GroceryItem(
         id="item-123",
         familyId="fam-123",

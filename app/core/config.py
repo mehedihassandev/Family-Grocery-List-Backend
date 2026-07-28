@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     firebase_service_account_json: str | None = None
     allowed_origins: str = ""
     allow_dev_bypass: bool = True
+    gemini_api_key: str | None = None
+    superstore_cache_ttl_hours: int = 6
 
     model_config = SettingsConfigDict(
         env_file=(BACKEND_DIR / ".env",),

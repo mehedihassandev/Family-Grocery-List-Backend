@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -9,7 +9,7 @@ def format_datetime(v: Any) -> Any:
         return None
     if isinstance(v, datetime):
         if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
+            v = v.replace(tzinfo=UTC)
         return v.isoformat().replace("+00:00", "Z")
     return str(v)
 

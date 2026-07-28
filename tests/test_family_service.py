@@ -1,3 +1,4 @@
+from datetime import UTC
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -145,7 +146,6 @@ def test_get_family_service(mock_fs: MagicMock) -> None:
 
 @patch("app.services.family.get_firestore_client")
 def test_get_family_service_datetime_with_nanoseconds(mock_fs: MagicMock) -> None:
-    from datetime import timezone
     from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
     fam_doc = MagicMock()
@@ -155,7 +155,7 @@ def test_get_family_service_datetime_with_nanoseconds(mock_fs: MagicMock) -> Non
         "name": "Smith Family",
         "inviteCode": "K9X2M4",
         "ownerId": "user_abc",
-        "createdAt": DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=timezone.utc),
+        "createdAt": DatetimeWithNanoseconds(2026, 7, 27, 16, 20, 0, tzinfo=UTC),
     }
     mock_fs.return_value.collection.return_value.document.return_value.get.return_value = fam_doc
 
