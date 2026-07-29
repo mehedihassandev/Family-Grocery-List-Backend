@@ -19,6 +19,9 @@ class GroceryItem(BaseModel):
     category: str = "Other"
     priority: Literal["Urgent", "High", "Medium", "Low"] = "Medium"
     quantity: str | None = None
+    unit: str | None = "pcs"
+    unitPrice: float | None = None
+    actualPrice: float | None = None
     notes: str | None = None
     status: Literal["pending", "in_cart", "completed"] = "pending"
     addedBy: GroceryActor | None = None
@@ -58,6 +61,8 @@ class CreateGroceryItemRequest(BaseModel):
     category: str = "Other"
     priority: Literal["Urgent", "High", "Medium", "Low"] = "Medium"
     quantity: str | None = None
+    unit: str | None = "pcs"
+    unitPrice: float | None = None
     notes: str | None = None
 
 
@@ -66,6 +71,9 @@ class UpdateGroceryItemRequest(BaseModel):
     category: str | None = None
     priority: Literal["Urgent", "High", "Medium", "Low"] | None = None
     quantity: str | None = None
+    unit: str | None = None
+    unitPrice: float | None = None
+    actualPrice: float | None = None
     notes: str | None = None
     status: Literal["pending", "in_cart", "completed"] | None = None
 
