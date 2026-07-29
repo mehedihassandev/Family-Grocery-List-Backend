@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 import httpx
 
 from app.core.config import get_settings
+from app.core.firebase import get_firestore_client
+from app.services.scraper import register_frequent_search_query
 from app.models.superstores import (
     BasketOptimizationRequest,
     BasketOptimizationResponse,
@@ -83,116 +85,6 @@ BENGALI_TERM_MAP: dict[str, str] = {
     "লবণ": "salt",
     "ডাল": "dal",
     "মসুর ডাল": "masoor dal",
-}
-
-# Comprehensive Base Price Catalog (BDT) for all major supermarket items
-BASE_PRICE_CATALOG: dict[str, tuple[str, float, float | None, str]] = {
-    # Fruits & Produce
-    "mango": ("Fresh Himsagar / Langra Mango", 250.0, 270.0, "1 kg"),
-    "himsagar mango": ("Fresh Himsagar Mango", 260.0, 280.0, "1 kg"),
-    "langra mango": ("Fresh Langra Mango", 250.0, 270.0, "1 kg"),
-    "apple": ("Fresh Red Fuji Apple", 280.0, 300.0, "1 kg"),
-    "green apple": ("Fresh Green Apple", 320.0, 340.0, "1 kg"),
-    "banana": ("Fresh Sagar Banana", 100.0, 110.0, "12 Pcs"),
-    "orange": ("Imported Fresh Orange", 260.0, 280.0, "1 kg"),
-    "malta": ("Imported Malta", 240.0, 260.0, "1 kg"),
-    "grape": ("Fresh Black / Green Grapes", 380.0, 420.0, "1 kg"),
-    "guava": ("Fresh Thai Guava", 120.0, 135.0, "1 kg"),
-    "papaya": ("Ripe Sweet Papaya", 110.0, 125.0, "1 kg"),
-    "watermelon": ("Fresh Sweet Watermelon", 50.0, 60.0, "1 kg"),
-    "lemon": ("Fresh Green Lemon", 60.0, 70.0, "4 Pcs"),
-    "pineapple": ("Fresh Honey Queen Pineapple", 70.0, 80.0, "1 Pcs"),
-    "onion": ("Deshi Onion", 85.0, 95.0, "1 kg"),
-    "imported onion": ("Imported Indian Onion", 75.0, 85.0, "1 kg"),
-    "potato": ("Fresh Granola Potato", 55.0, 60.0, "1 kg"),
-    "tomato": ("Ripe Red Tomato", 80.0, 90.0, "1 kg"),
-    "garlic": ("Imported Garlic", 210.0, 230.0, "1 kg"),
-    "ginger": ("Fresh Ginger", 240.0, 260.0, "1 kg"),
-    "chili": ("Fresh Green Chili", 160.0, 180.0, "1 kg"),
-    "green chili": ("Fresh Green Chili", 160.0, 180.0, "1 kg"),
-    "cucumber": ("Fresh Green Cucumber", 70.0, 80.0, "1 kg"),
-    "carrot": ("Fresh Orange Carrot", 90.0, 100.0, "1 kg"),
-    "brinjal": ("Fresh Purple Brinjal", 80.0, 90.0, "1 kg"),
-    "spinach": ("Fresh Palong Shak", 40.0, 50.0, "1 kg"),
-    "pumpkin": ("Sweet Yellow Pumpkin", 50.0, 60.0, "1 kg"),
-    "cauliflower": ("Fresh White Cauliflower", 50.0, 60.0, "1 Pcs"),
-    "cabbage": ("Fresh Green Cabbage", 45.0, 55.0, "1 Pcs"),
-    # Meat & Seafood
-    "beef": ("Fresh Bone-in Beef", 780.0, 820.0, "1 kg"),
-    "boneless beef": ("Fresh Premium Boneless Beef", 950.0, 1000.0, "1 kg"),
-    "mutton": ("Fresh Mutton", 1100.0, 1150.0, "1 kg"),
-    "chicken": ("Fresh Broiler Chicken", 220.0, 240.0, "1 kg"),
-    "broiler chicken": ("Fresh Broiler Chicken", 220.0, 240.0, "1 kg"),
-    "sonali chicken": ("Fresh Sonali Chicken", 340.0, 370.0, "1 kg"),
-    "deshi chicken": ("Fresh Country / Deshi Chicken", 650.0, 700.0, "1 kg"),
-    "fish": ("Fresh Ruhi Fish", 380.0, 410.0, "1 kg"),
-    "ruhi fish": ("Fresh Ruhi Fish", 380.0, 410.0, "1 kg"),
-    "hilsa": ("Padma Hilsa Fish", 1450.0, 1600.0, "1 kg"),
-    "hilsa fish": ("Padma Hilsa Fish", 1450.0, 1600.0, "1 kg"),
-    "tilapia": ("Fresh Tilapia Fish", 220.0, 240.0, "1 kg"),
-    "katla": ("Fresh Katla Fish", 400.0, 430.0, "1 kg"),
-    "prawn": ("Fresh Medium Prawns", 750.0, 820.0, "1 kg"),
-    "shrimp": ("Fresh Small Shrimp", 650.0, 720.0, "1 kg"),
-    "egg": ("Farm Fresh Brown Eggs", 145.0, 155.0, "12 Pcs"),
-    "eggs": ("Farm Fresh Brown Eggs", 145.0, 155.0, "12 Pcs"),
-    "eggs 12 pcs": ("Farm Fresh Brown Eggs 12 Pcs", 145.0, 155.0, "12 Pcs"),
-    # Oils, Ghee & Dairy
-    "oil": ("Fortified Soybean Oil", 175.0, 185.0, "1 Ltr"),
-    "soybean oil": ("Fortified Soybean Oil", 175.0, 185.0, "1 Ltr"),
-    "soyabean oil 5l": ("Teer Soyabean Oil 5 Ltr", 810.0, 825.0, "5 Ltr"),
-    "teer soyabean oil 5l": ("Teer Pure Soybean Oil 5L", 810.0, 825.0, "5 Ltr"),
-    "mustard oil": ("Pure Mustard Oil", 220.0, 235.0, "1 Ltr"),
-    "sunflower oil": ("Imported Sunflower Oil", 310.0, 330.0, "1 Ltr"),
-    "olive oil": ("Extra Virgin Olive Oil", 1250.0, 1350.0, "1 Ltr"),
-    "milk": ("Aarong Pasteurized Liquid Milk", 90.0, 95.0, "1 Ltr"),
-    "milk 1l": ("Aarong Pasteurized Milk 1L", 90.0, 95.0, "1 Ltr"),
-    "powdered milk": ("Dano Full Cream Powdered Milk 500g", 440.0, 460.0, "500g"),
-    "butter": ("Pasteurized Dairy Butter 200g", 215.0, 225.0, "200g"),
-    "aarong butter 200g": ("Aarong Dairy Butter 200g", 215.0, 225.0, "200g"),
-    "ghee": ("Aarong Pure Dairy Ghee 500g", 720.0, 760.0, "500g"),
-    "cheese": ("Processed Dairy Cheese Slices 200g", 280.0, 300.0, "200g"),
-    "dahi": ("Fresh Sweet Dahi 500g", 140.0, 155.0, "500g"),
-    "yogurt": ("Fresh Plain Sour Yogurt 500g", 120.0, 135.0, "500g"),
-    # Staples, Flours & Grains
-    "rice": ("Premium Miniket Rice", 78.0, 85.0, "1 kg"),
-    "miniket rice": ("Premium Miniket Rice", 78.0, 85.0, "1 kg"),
-    "rice 5kg": ("Miniket Rice 5kg", 380.0, 400.0, "5 kg"),
-    "kataribhog rice": ("Kataribhog Rice", 85.0, 92.0, "1 kg"),
-    "kataribhog rice 5kg": ("Kataribhog Rice 5kg", 420.0, 440.0, "5 kg"),
-    "chinigura rice": ("Aromatic Chinigura Rice", 150.0, 165.0, "1 kg"),
-    "basmati rice": ("Imported Premium Basmati Rice", 280.0, 310.0, "1 kg"),
-    "atta": ("Pure White Atta", 60.0, 65.0, "1 kg"),
-    "atta 2kg": ("Pure White Atta 2kg", 115.0, 120.0, "2 kg"),
-    "teer atta 2kg": ("Teer Fortified Atta 2kg", 120.0, 125.0, "2 kg"),
-    "maida": ("Fine White Maida", 70.0, 75.0, "1 kg"),
-    "suji": ("Semolina / Suji 500g", 45.0, 50.0, "500g"),
-    "sugar": ("Refined White Sugar", 135.0, 140.0, "1 kg"),
-    "salt": ("Iodized Salt", 42.0, 45.0, "1 kg"),
-    # Pulses & Spices (Dal & Masala)
-    "dal": ("Deshi Masoor Dal", 140.0, 150.0, "1 kg"),
-    "masoor dal": ("Deshi Masoor Dal", 140.0, 150.0, "1 kg"),
-    "moong dal": ("Premium Yellow Moong Dal", 175.0, 190.0, "1 kg"),
-    "chana dal": ("Deshi Chana Dal", 125.0, 135.0, "1 kg"),
-    "turmeric": ("Radhuni Turmeric Powder 200g", 90.0, 100.0, "200g"),
-    "chili powder": ("Radhuni Red Chili Powder 200g", 110.0, 120.0, "200g"),
-    "coriander": ("Radhuni Coriander Powder 200g", 85.0, 95.0, "200g"),
-    "cumin": ("Radhuni Cumin Powder 200g", 240.0, 260.0, "200g"),
-    "garam masala": ("Radhuni Garam Masala 100g", 160.0, 180.0, "100g"),
-    # Beverages & Snacks
-    "tea": ("Ispahani Mirzapore Black Tea 400g", 220.0, 235.0, "400g"),
-    "coffee": ("Nescafe Classic Coffee 100g", 360.0, 390.0, "100g"),
-    "noodles": ("Maggi 2-Minute Noodles 8-Pack", 160.0, 175.0, "1 Pack"),
-    "pasta": ("Cocola Macaroni Pasta 400g", 85.0, 95.0, "400g"),
-    "biscuits": ("Lexus Vegetable Crackers 250g", 90.0, 100.0, "250g"),
-    "bread": ("Fresh White Sandwich Bread 350g", 65.0, 75.0, "350g"),
-    "oats": ("Quaker White Oats 500g", 320.0, 350.0, "500g"),
-    "honey": ("AP Commercial Natural Honey 250g", 280.0, 310.0, "250g"),
-    # Household
-    "soap": ("Lux Beauty Soap 100g", 65.0, 75.0, "100g"),
-    "shampoo": ("Sunsilk Black Shine Shampoo 375ml", 360.0, 390.0, "375ml"),
-    "dishwash": ("Vim Dishwash Liquid 500ml", 130.0, 145.0, "500ml"),
-    "detergent": ("Wheel Wash Powder 1kg", 140.0, 155.0, "1 kg"),
-    "tissue": ("Bashundhara Facial Tissue 2-Ply", 75.0, 85.0, "1 Pack"),
 }
 
 # In-memory TTL Cache: { cache_key: (timestamp, SuperstoreSearchResponse) }
@@ -364,115 +256,92 @@ def _extract_clean_product_name(query: str) -> str:
     return cleaned if cleaned else translated.strip()
 
 
-def _estimate_item_price(
-    query: str, store_info: dict
-) -> tuple[str, float, float | None, str]:
-    translated = _translate_bengali_terms(query)
-    q_norm = translated.lower().strip()
-    q_clean = _extract_clean_product_name(translated).lower()
-
-    # Check catalog matching (exact query first, then clean product name)
-    if q_norm in BASE_PRICE_CATALOG:
-        title, base_price, base_orig, unit_qty = BASE_PRICE_CATALOG[q_norm]
-    elif q_clean in BASE_PRICE_CATALOG:
-        title, base_price, base_orig, unit_qty = BASE_PRICE_CATALOG[q_clean]
-    else:
-        matched_key = next(
-            (
-                k
-                for k in BASE_PRICE_CATALOG
-                if k in q_norm or q_norm in k or k in q_clean or q_clean in k
-            ),
-            None,
-        )
-        if matched_key:
-            title, base_price, base_orig, unit_qty = BASE_PRICE_CATALOG[matched_key]
-        else:
-            title = _extract_clean_product_name(translated).title()
-            base_price = 250.0
-            base_orig = 265.0
-            unit_qty = _extract_unit_quantity(translated, title)
-
-    modifier = store_info["price_modifier"]
-    price_bdt = round(base_price * modifier, 0)
-
-    orig_bdt = None
-    if store_info["orig_modifier"] and base_orig is not None:
-        orig_bdt = round(base_orig * store_info["orig_modifier"], 0)
-
-    full_title = title
-    if store_info["name"] == "Shwapno" and "Teer" in title and "Pure" not in title:
-        full_title = title.replace("Pure Soybean Oil 5L", "Teer Soyabean Oil 5 Ltr")
-    elif store_info["name"] == "Agora" and "Fortified" not in title:
-        full_title = title.replace(
-            "Teer Soyabean Oil 5 Ltr", "Teer Fortified Soybean Oil 5L"
-        )
-
-    return full_title, price_bdt, orig_bdt, unit_qty
 
 
 def _fetch_single_store_price(
     query: str, store_info: dict, timeout_ms: int = 3000
 ) -> StorePriceItem:
-    """Fetch product price from a single store with strict 3000ms timeout & fallback handling."""
+    """Return unavailable status when store product is absent from live database."""
     now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     slug = _slugify(_extract_clean_product_name(query))
-
-    clean_query = re.sub(r"[^\w\s]", "", query).strip()
-    search_url = store_info["search_url_template"].format(
-        query=urllib.parse.quote(clean_query)
-    )
     item_url = store_info["item_url_template"].format(slug=slug)
-
-    try:
-        with httpx.Client(
-            timeout=timeout_ms / 1000.0, follow_redirects=True
-        ) as client:
-            response = client.get(
-                search_url, headers={"User-Agent": "FamilyGroceryApp/1.0"}
-            )
-
-            if response.status_code != 200:
-                return StorePriceItem(
-                    storeName=store_info["name"],
-                    storeUrl=store_info["url"],
-                    productTitle=f"{query.title()} (Unavailable)",
-                    priceBDT=0.0,
-                    originalPriceBDT=None,
-                    unitQuantity=_extract_unit_quantity(query, ""),
-                    isAvailable=False,
-                    stockStatus="out_of_stock",
-                    isBestPrice=False,
-                    itemUrl=item_url,
-                    lastUpdated=now_iso,
-                    message=f"Item '{query.title()}' is not available at {store_info['name']}.",
-                )
-    except (httpx.TimeoutException, httpx.RequestError):
-        pass
-
-    title, price_bdt, orig_bdt, unit_qty = _estimate_item_price(query, store_info)
 
     return StorePriceItem(
         storeName=store_info["name"],
         storeUrl=store_info["url"],
-        productTitle=title,
-        priceBDT=price_bdt,
-        originalPriceBDT=orig_bdt,
-        unitQuantity=unit_qty,
-        isAvailable=True,
-        stockStatus="in_stock",
+        productTitle=f"{query.title()} (Unavailable)",
+        priceBDT=0.0,
+        originalPriceBDT=None,
+        unitQuantity=_extract_unit_quantity(query, ""),
+        isAvailable=False,
+        stockStatus="out_of_stock",
         isBestPrice=False,
         itemUrl=item_url,
         lastUpdated=now_iso,
+        message=f"Item '{query.title()}' is currently out of stock or unlisted at {store_info['name']}.",
     )
+
+
+
+def _get_firestore_catalog_items(clean_query: str) -> list[StorePriceItem]:
+    """Retrieve real scraped product prices from Firestore catalog if available."""
+    try:
+        db = get_firestore_client()
+        clean_name = _extract_clean_product_name(clean_query).lower()
+        candidate_terms = [clean_name, clean_query.lower()]
+        for term in ["oil", "beef", "rice", "mango", "milk", "butter", "egg", "dal", "atta", "sugar", "salt", "mutton", "chicken", "fish"]:
+            if term in clean_query.lower() and term not in candidate_terms:
+                candidate_terms.append(term)
+
+        items: list[StorePriceItem] = []
+        seen_stores: set[str] = set()
+
+        for term in candidate_terms:
+            docs = (
+                db.collection("superstore_catalog")
+                .where("normalizedQuery", "==", term)
+                .stream()
+            )
+            for doc in docs:
+                data = doc.to_dict() or {}
+                sname = data.get("storeName", "Superstore")
+                if sname not in seen_stores:
+                    seen_stores.add(sname)
+                    items.append(
+                        StorePriceItem(
+                            storeName=sname,
+                            storeUrl=data.get("storeUrl", ""),
+                            productTitle=data.get("productTitle", clean_query.title()),
+                            priceBDT=float(data.get("priceBDT", 0.0)),
+                            originalPriceBDT=float(data["originalPriceBDT"])
+                            if data.get("originalPriceBDT")
+                            else None,
+                            unitQuantity=data.get("unitQuantity", "1 kg"),
+                            isAvailable=bool(data.get("isAvailable", True)),
+                            stockStatus=data.get("stockStatus", "in_stock"),
+                            isBestPrice=False,
+                            itemUrl=data.get("itemUrl", ""),
+                            lastUpdated=data.get(
+                                "lastUpdated",
+                                datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            ),
+                        )
+                    )
+            if len(items) >= 3:
+                break
+        return items
+    except Exception:
+        return []
+
 
 
 def search_superstore_prices(
     query: str, unit: str | None = None
 ) -> SuperstoreSearchResponse:
-    """Search price and availability across Shwapno, Meena Bazar, and Agora."""
+    """Search price and availability across Shwapno, Meena Bazar, Agora, and Chaldal."""
     raw_query = query.strip()
     clean_query = _translate_bengali_terms(raw_query)
+    register_frequent_search_query(clean_query)
     clean_unit = unit.strip() if unit else None
     cache_key = (
         clean_query.lower()
@@ -491,10 +360,15 @@ def search_superstore_prices(
     if clean_unit and clean_unit.lower() not in clean_query.lower():
         effective_query = f"{clean_query} {clean_unit}"
 
-    store_prices: list[StorePriceItem] = []
-    for store_info in STORES:
-        item = _fetch_single_store_price(effective_query, store_info)
-        store_prices.append(item)
+    # First attempt: Check real scraped Firestore catalog
+    store_prices: list[StorePriceItem] = _get_firestore_catalog_items(clean_query)
+
+    # Fallback to estimated store prices if Firestore catalog has no data for query
+    if not store_prices:
+        for store_info in STORES:
+            item = _fetch_single_store_price(effective_query, store_info)
+            store_prices.append(item)
+
 
     # Determine requested target unit string
     target_unit_str = None

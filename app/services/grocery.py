@@ -206,6 +206,7 @@ def summarize_grocery_items(
 ) -> GrocerySummary:
     total_items = 0
     pending_items = 0
+    in_cart_items = 0
     completed_items = 0
     urgent_items = 0
     category_totals: dict[str, int] = {}
@@ -214,8 +215,11 @@ def summarize_grocery_items(
         data = item.model_dump() if isinstance(item, GroceryItem) else dict(item)
         total_items += 1
 
-        if data.get("status") == "completed":
+        status = data.get("status")
+        if status == "completed":
             completed_items += 1
+        elif status == "in_cart":
+            in_cart_items += 1
         else:
             pending_items += 1
 
@@ -232,6 +236,7 @@ def summarize_grocery_items(
         familyId=family_id,
         totalItems=total_items,
         pendingItems=pending_items,
+        inCartItems=in_cart_items,
         completedItems=completed_items,
         urgentItems=urgent_items,
         categoryTotals=category_totals,

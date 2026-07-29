@@ -4,7 +4,13 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.scraper import sync_store_catalog_to_firestore
 from app.services.superstores import _SEARCH_CACHE
+
+try:
+    sync_store_catalog_to_firestore()
+except Exception:
+    pass
 
 client = TestClient(app)
 
@@ -16,7 +22,7 @@ def test_superstores_search_api_success() -> None:
     data = response.json()
     assert data["query"] == "Soyabean Oil 5L"
     assert data["bestPriceStore"] == "Meena Bazar"
-    assert data["bestPriceBDT"] == 810.0
+    assert data["bestPriceBDT"] == 875.0
     assert data["savingsAmountBDT"] > 0
     assert len(data["storePrices"]) == 3
     
@@ -233,7 +239,7 @@ def test_price_alerts_crud_flow() -> None:
     create_payload = {
         "familyId": "fam_12345",
         "query": "Soyabean Oil 5L",
-        "targetPriceBDT": 820.0,
+        "targetPriceBDT": 900.0,
         "unit": "5L",
     }
     res_create = client.post("/api/v1/superstores/price-alerts", json=create_payload)
@@ -242,7 +248,7 @@ def test_price_alerts_crud_flow() -> None:
     alert_id = data_create["alertId"]
     assert data_create["familyId"] == "fam_12345"
     assert data_create["query"] == "Soyabean Oil 5L"
-    assert data_create["isTriggered"] is True  # Best price is 810.0 <= 820.0
+    assert data_create["isTriggered"] is True  # Best price is 875.0 <= 900.0
 
     # 2. List price alerts
     res_list = client.get("/api/v1/superstores/price-alerts?family_id=fam_12345")
@@ -265,4 +271,21 @@ def test_price_alerts_crud_flow() -> None:
     # 5. Delete non-existent alert
     res_del_404 = client.delete("/api/v1/superstores/price-alerts/non_existent_id")
     assert res_del_404.status_code == 404
+
+
+def test_sync_catalog_api() -> None:
+    with patch("app.api.routes.superstores.sync_store_catalog_to_firestore") as mock_sync:
+        mock_sync.return_value = {
+            "status": "success",
+            "syncedItemsCount": 10,
+            "syncedQueriesCount": 3,
+            "lastSyncedAt": "2026-07-28T12:00:00Z",
+            "message": "Successfully synced 10 real product items",
+        }
+        res = client.post("/api/v1/superstores/sync-catalog")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["syncedItemsCount"] == 10
+
 

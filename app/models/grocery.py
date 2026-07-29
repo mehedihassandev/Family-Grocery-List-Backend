@@ -20,14 +20,16 @@ class GroceryItem(BaseModel):
     priority: Literal["Urgent", "High", "Medium", "Low"] = "Medium"
     quantity: str | None = None
     notes: str | None = None
-    status: Literal["pending", "completed"] = "pending"
+    status: Literal["pending", "in_cart", "completed"] = "pending"
     addedBy: GroceryActor | None = None
+    claimedBy: GroceryActor | None = None
     completedBy: GroceryActor | None = None
     createdAt: Any | None = None
     updatedAt: Any | None = None
+    claimedAt: Any | None = None
     completedAt: Any | None = None
 
-    @field_validator("createdAt", "updatedAt", "completedAt", mode="before")
+    @field_validator("createdAt", "updatedAt", "claimedAt", "completedAt", mode="before")
     @classmethod
     def parse_datetime_fields(cls, v: Any) -> Any:
         return format_datetime(v)
@@ -39,6 +41,7 @@ class GrocerySummary(BaseModel):
     familyId: str
     totalItems: int
     pendingItems: int
+    inCartItems: int = 0
     completedItems: int
     urgentItems: int
     categoryTotals: dict[str, int]
@@ -64,6 +67,6 @@ class UpdateGroceryItemRequest(BaseModel):
     priority: Literal["Urgent", "High", "Medium", "Low"] | None = None
     quantity: str | None = None
     notes: str | None = None
-    status: Literal["pending", "completed"] | None = None
+    status: Literal["pending", "in_cart", "completed"] | None = None
 
 

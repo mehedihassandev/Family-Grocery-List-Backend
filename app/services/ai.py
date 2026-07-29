@@ -184,7 +184,7 @@ def convert_recipe_to_grocery(payload: RecipeToGroceryRequest) -> RecipeToGrocer
         try:
             gemini_key = settings.gemini_api_key
             url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:"
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:"
                 f"generateContent?key={gemini_key}"
             )
             prompt_text = (
@@ -304,7 +304,7 @@ def generate_monthly_insights(payload: MonthlyInsightsRequest) -> MonthlyInsight
         try:
             gemini_key = settings.gemini_api_key
             url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:"
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:"
                 f"generateContent?key={gemini_key}"
             )
             prompt_text = (

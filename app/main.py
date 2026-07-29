@@ -5,6 +5,9 @@ from pathlib import Path
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,10 +16,37 @@ from google.auth.exceptions import DefaultCredentialsError
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.services.scraper import sync_store_catalog_to_firestore
 
 settings = get_settings()
+scheduler = BackgroundScheduler()
 
-app = FastAPI(title=settings.data_api_title)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        # 1. Trigger immediate initial catalog pull on server startup
+        scheduler.add_job(
+            sync_store_catalog_to_firestore,
+            id="initial_superstore_catalog_pull",
+        )
+        # 2. Schedule recurring catalog refresh every 6 hours
+        scheduler.add_job(
+            sync_store_catalog_to_firestore,
+            "interval",
+            hours=settings.superstore_cache_ttl_hours,
+            id="superstore_catalog_sync",
+            replace_existing=True,
+        )
+        scheduler.start()
+    except Exception:
+        pass
+    yield
+    if scheduler.running:
+        scheduler.shutdown()
+
+
+app = FastAPI(title=settings.data_api_title, lifespan=lifespan)
 
 allowed_origins = settings.allowed_origin_list
 if allowed_origins:

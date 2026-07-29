@@ -114,3 +114,31 @@ class PriceAlertResponse(BaseModel):
     message: str | None = None
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class SuperstoreCatalogDocument(BaseModel):
+    id: str
+    storeName: str
+    storeUrl: str
+    productTitle: str
+    normalizedQuery: str
+    priceBDT: float
+    originalPriceBDT: float | None = None
+    unitQuantity: str | None = None
+    isAvailable: bool = True
+    stockStatus: str = "in_stock"
+    itemUrl: str
+    lastUpdated: str
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SuperstoreSyncResponse(BaseModel):
+    status: str
+    syncedItemsCount: int
+    syncedQueriesCount: int
+    lastSyncedAt: str
+    message: str
+
+    model_config = ConfigDict(populate_by_name=True)
+

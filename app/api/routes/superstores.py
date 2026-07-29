@@ -10,7 +10,9 @@ from app.models.superstores import (
     PriceAlertResponse,
     SplitBasketOptimizationResponse,
     SuperstoreSearchResponse,
+    SuperstoreSyncResponse,
 )
+from app.services.scraper import sync_store_catalog_to_firestore
 from app.services.superstores import (
     check_price_alerts,
     create_price_alert,
@@ -136,3 +138,13 @@ def trigger_alert_check(
 ) -> list[PriceAlertResponse]:
     """Check current market prices against active alerts and update triggered status."""
     return check_price_alerts(family_id.strip() if family_id else None)
+
+
+@router.post("/superstores/sync-catalog", response_model=SuperstoreSyncResponse)
+def trigger_catalog_sync(
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
+    queries: list[str] | None = None,
+) -> SuperstoreSyncResponse:
+    """Manually trigger background real catalog scraping and Firestore sync."""
+    return sync_store_catalog_to_firestore(queries)
+
