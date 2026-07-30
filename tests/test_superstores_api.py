@@ -1,16 +1,52 @@
+import pytest
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.scraper import sync_store_catalog_to_firestore
+from app.services.scraper import COMMON_SEARCH_QUERIES, scrape_store_products_for_query
 from app.services.superstores import _SEARCH_CACHE
 
-try:
-    sync_store_catalog_to_firestore()
-except Exception:
-    pass
+# Prepare in-memory catalog data for test execution without relying on GCP credentials
+_MOCK_CATALOG_ITEMS = []
+for _q in COMMON_SEARCH_QUERIES:
+    _MOCK_CATALOG_ITEMS.extend(scrape_store_products_for_query(_q))
+
+
+class _MockDoc:
+    def __init__(self, data: dict):
+        self._data = data
+
+    def to_dict(self) -> dict:
+        return self._data.copy()
+
+
+class _MockQuery:
+    def __init__(self, docs: list[dict]):
+        self._docs = docs
+
+    def where(self, field: str, op: str, value: str):
+        return _MockQuery([d for d in self._docs if d.get(field) == value])
+
+    def stream(self):
+        return [_MockDoc(d) for d in self._docs]
+
+
+class _MockFirestoreDB:
+    def __init__(self, docs: list[dict]):
+        self._docs = docs
+
+    def collection(self, name: str):
+        return _MockQuery(self._docs)
+
+
+@pytest.fixture(autouse=True)
+def _mock_firestore_catalog():
+    mock_db = _MockFirestoreDB(_MOCK_CATALOG_ITEMS)
+    with patch("app.services.superstores.get_firestore_client", return_value=mock_db):
+        yield
+
 
 client = TestClient(app)
 

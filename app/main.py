@@ -24,23 +24,24 @@ scheduler = BackgroundScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        # 1. Trigger immediate initial catalog pull on server startup
-        scheduler.add_job(
-            sync_store_catalog_to_firestore,
-            id="initial_superstore_catalog_pull",
-        )
-        # 2. Schedule recurring catalog refresh every 6 hours
-        scheduler.add_job(
-            sync_store_catalog_to_firestore,
-            "interval",
-            hours=settings.superstore_cache_ttl_hours,
-            id="superstore_catalog_sync",
-            replace_existing=True,
-        )
-        scheduler.start()
-    except Exception:
-        pass
+    if "pytest" not in sys.modules:
+        try:
+            # 1. Trigger immediate initial catalog pull on server startup
+            scheduler.add_job(
+                sync_store_catalog_to_firestore,
+                id="initial_superstore_catalog_pull",
+            )
+            # 2. Schedule recurring catalog refresh every 6 hours
+            scheduler.add_job(
+                sync_store_catalog_to_firestore,
+                "interval",
+                hours=settings.superstore_cache_ttl_hours,
+                id="superstore_catalog_sync",
+                replace_existing=True,
+            )
+            scheduler.start()
+        except Exception:
+            pass
     yield
     if scheduler.running:
         scheduler.shutdown()
