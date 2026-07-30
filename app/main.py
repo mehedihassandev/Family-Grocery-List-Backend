@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from pathlib import Path
@@ -17,6 +18,19 @@ from google.auth.exceptions import DefaultCredentialsError
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.services.scraper import sync_store_catalog_to_firestore
+
+
+class EndpointFilter(logging.Filter):
+    def __init__(self, path: str):
+        super().__init__()
+        self.path = path
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return self.path not in record.getMessage()
+
+
+# Filter out /health access logs from uvicorn
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter("/health"))
 
 settings = get_settings()
 scheduler = BackgroundScheduler()
