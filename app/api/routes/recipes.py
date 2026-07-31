@@ -2,9 +2,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import ensure_family_access, get_current_user
+from app.core.firebase import get_firestore_client
 from app.models.recipe import RecipeDetail, RecipeIngredient, RecipeStep, RecipePack, RecipePackItem
 from app.models.grocery import CreateGroceryItemRequest, GroceryActor
 from app.services.grocery import create_grocery_item
+
+RECIPES_COLLECTION = "recipes"
 
 router = APIRouter()
 
@@ -181,8 +184,17 @@ def list_recipe_packs() -> list[RecipePack]:
 
 @router.get("/recipes", response_model=list[RecipeDetail])
 def list_recipes() -> list[RecipeDetail]:
-    """Retrieve all available and AI-generated recipes."""
-    return list(RECIPES_STORE.values())
+    """Retrieve all available and AI-generated recipes (hardcoded + Firestore)."""
+    recipes = dict(RECIPES_STORE)
+    try:
+        docs = get_firestore_client().collection(RECIPES_COLLECTION).stream()
+        for doc in docs:
+            data = doc.to_dict() or {}
+            data.setdefault("id", doc.id)
+            recipes[doc.id] = RecipeDetail.model_validate(data)
+    except Exception:
+        pass
+    return list(recipes.values())
 
 
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
@@ -190,13 +202,28 @@ def read_recipe_detail(recipe_id: str) -> RecipeDetail:
     """Retrieve detailed recipe info including ingredients, pantry match, and instructions."""
     if recipe_id in RECIPES_STORE:
         return RECIPES_STORE[recipe_id]
+    # Check Firestore for AI-generated recipes
+    try:
+        doc = get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).get()
+        if doc.exists:
+            data = doc.to_dict() or {}
+            data.setdefault("id", doc.id)
+            return RecipeDetail.model_validate(data)
+    except Exception:
+        pass
     return CREAMY_GARLIC_PASTA
 
 
 @router.post("/recipes", response_model=RecipeDetail, status_code=status.HTTP_201_CREATED)
 def create_ai_recipe(recipe: RecipeDetail) -> RecipeDetail:
-    """Save an AI-generated recipe to the database."""
-    RECIPES_STORE[recipe.id] = recipe
+    """Save an AI-generated recipe to Firestore."""
+    try:
+        get_firestore_client().collection(RECIPES_COLLECTION).document(recipe.id).set(
+            recipe.model_dump()
+        )
+    except Exception:
+        # Fallback: keep in-memory so the API still works
+        RECIPES_STORE[recipe.id] = recipe
     return recipe
 
 
@@ -220,7 +247,18 @@ def add_missing_recipe_ingredients(
     else:
         actor = GroceryActor(uid="system", name="System Chef", photoURL=None)
 
-    target_recipe = RECIPES_STORE.get(recipe_id, CREAMY_GARLIC_PASTA)
+    target_recipe = RECIPES_STORE.get(recipe_id)
+    if not target_recipe:
+        try:
+            doc = get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                data.setdefault("id", doc.id)
+                target_recipe = RecipeDetail.model_validate(data)
+        except Exception:
+            pass
+    if not target_recipe:
+        target_recipe = CREAMY_GARLIC_PASTA
     missing_items = [i for i in target_recipe.ingredients if not i.inPantry]
     added = []
 

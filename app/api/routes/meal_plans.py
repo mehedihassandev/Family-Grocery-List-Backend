@@ -3,15 +3,28 @@ from fastapi import APIRouter, Depends
 import uuid
 
 from app.api.dependencies import ensure_family_access, get_current_user
+from app.core.firebase import get_firestore_client
 from app.models.meal_plan import AddMealItemRequest, DailyMealPlan, MealItem
 
 router = APIRouter()
 
-# In-memory mock store for meal plans
-MEAL_PLANS_STORE: dict[str, DailyMealPlan] = {}
+
+def _meal_plan_ref(family_id: str, date_str: str):
+    """Return a Firestore document reference for a family's daily meal plan."""
+    return (
+        get_firestore_client()
+        .collection("families")
+        .document(family_id)
+        .collection("meal_plans")
+        .document(date_str)
+    )
 
 
-def _get_empty_meal_plan(date_str: str) -> DailyMealPlan:
+def _load_meal_plan(family_id: str, date_str: str) -> DailyMealPlan:
+    """Load a meal plan from Firestore or return a fresh empty plan."""
+    doc = _meal_plan_ref(family_id, date_str).get()
+    if doc.exists:
+        return DailyMealPlan.model_validate(doc.to_dict())
     return DailyMealPlan(
         date=date_str,
         dayName="Active Day",
@@ -25,6 +38,10 @@ def _get_empty_meal_plan(date_str: str) -> DailyMealPlan:
     )
 
 
+def _save_meal_plan(family_id: str, plan: DailyMealPlan) -> None:
+    """Persist a meal plan document to Firestore."""
+    _meal_plan_ref(family_id, plan.date).set(plan.model_dump())
+
 
 @router.get("/families/{family_id}/meal-plans", response_model=DailyMealPlan)
 def read_family_meal_plan(
@@ -35,12 +52,7 @@ def read_family_meal_plan(
     """Retrieve daily meal plan for selected family and date."""
     if current_user:
         ensure_family_access(family_id, current_user)
-
-    key = f"{family_id}:{date}"
-    if key not in MEAL_PLANS_STORE:
-        MEAL_PLANS_STORE[key] = _get_empty_meal_plan(date)
-
-    return MEAL_PLANS_STORE[key]
+    return _load_meal_plan(family_id, date)
 
 
 @router.post("/families/{family_id}/meal-plans/item", response_model=DailyMealPlan)
@@ -53,11 +65,7 @@ def add_meal_plan_item(
     if current_user:
         ensure_family_access(family_id, current_user)
 
-    key = f"{family_id}:{payload.date}"
-    if key not in MEAL_PLANS_STORE:
-        MEAL_PLANS_STORE[key] = _get_empty_meal_plan(payload.date)
-
-    plan = MEAL_PLANS_STORE[key]
+    plan = _load_meal_plan(family_id, payload.date)
     new_item = MealItem(
         id=str(uuid.uuid4())[:8],
         name=payload.name,
@@ -79,4 +87,7 @@ def add_meal_plan_item(
     plan.mealsPlannedCount = (
         len(plan.breakfast) + len(plan.lunch) + len(plan.dinner) + len(plan.snacks)
     )
+
+    _save_meal_plan(family_id, plan)
     return plan
+

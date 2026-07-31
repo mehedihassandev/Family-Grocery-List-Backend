@@ -77,7 +77,7 @@ def modify_grocery_item(
     payload: UpdateGroceryItemRequest,
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> GroceryItem:
-    """Update details or status (e.g. pending/completed) of a grocery item."""
+    """Update details or status (e.g. pending/in_cart/completed) of a grocery item."""
     ensure_family_access(family_id, current_user)
     existing = get_grocery_item(item_id)
     if not existing or existing.familyId != family_id:
@@ -86,23 +86,25 @@ def modify_grocery_item(
             detail="Grocery item not found for this family.",
         )
 
-    completed_actor = (
-        GroceryActor(
-            uid=current_user.get("uid", ""),
-            name=current_user.get("name", "Unknown User"),
-            photoURL=current_user.get("picture"),
-        )
-        if payload.status == "completed"
-        else None
+    user_actor = GroceryActor(
+        uid=current_user.get("uid", ""),
+        name=current_user.get("name", "Unknown User"),
+        photoURL=current_user.get("picture"),
     )
 
-    updated = update_grocery_item(item_id, payload, completed_by=completed_actor)
+    completed_actor = user_actor if payload.status == "completed" else None
+    claimed_actor = user_actor if payload.status == "in_cart" else None
+
+    updated = update_grocery_item(
+        item_id, payload, completed_by=completed_actor, claimed_by=claimed_actor,
+    )
     if not updated:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Failed to update grocery item.",
         )
     return updated
+
 
 
 @router.delete("/families/{family_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

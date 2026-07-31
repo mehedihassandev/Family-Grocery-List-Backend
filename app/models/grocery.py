@@ -32,7 +32,28 @@ class GroceryItem(BaseModel):
     claimedAt: Any | None = None
     completedAt: Any | None = None
 
-    @field_validator("createdAt", "updatedAt", "claimedAt", "completedAt", mode="before")
+    # ── Extended fields for assignment, scheduling & tracking ──
+    assignee: GroceryActor | None = None
+    dueDate: Any | None = None
+    reminderAt: Any | None = None
+    recurrenceFrequency: str | None = "none"
+    estimatedTotal: float | None = None
+
+    # ── Meal & consumption tracking ──
+    mealType: str | None = None
+    servingsCount: int | None = None
+    monthlyUsageFrequency: int | None = None
+
+    # ── Superstore selection ──
+    selectedSuperstore: str | None = None
+    storeName: str | None = None
+    unitPriceNormalized: float | None = None
+
+    @field_validator(
+        "createdAt", "updatedAt", "claimedAt", "completedAt",
+        "dueDate", "reminderAt",
+        mode="before",
+    )
     @classmethod
     def parse_datetime_fields(cls, v: Any) -> Any:
         return format_datetime(v)
@@ -47,6 +68,7 @@ class GrocerySummary(BaseModel):
     inCartItems: int = 0
     completedItems: int
     urgentItems: int
+    assignedItems: int = 0
     categoryTotals: dict[str, int]
     updatedAt: datetime | str | None = None
 
@@ -65,6 +87,18 @@ class CreateGroceryItemRequest(BaseModel):
     unitPrice: float | None = None
     notes: str | None = None
 
+    # ── Extended fields ──
+    assignee: GroceryActor | None = None
+    dueDate: str | None = None
+    reminderAt: str | None = None
+    recurrenceFrequency: str | None = "none"
+    estimatedTotal: float | None = None
+    mealType: str | None = None
+    servingsCount: int | None = None
+    monthlyUsageFrequency: int | None = None
+    selectedSuperstore: str | None = None
+    storeName: str | None = None
+
 
 class UpdateGroceryItemRequest(BaseModel):
     name: str | None = None
@@ -77,4 +111,19 @@ class UpdateGroceryItemRequest(BaseModel):
     notes: str | None = None
     status: Literal["pending", "in_cart", "completed"] | None = None
 
+    # ── Extended fields ──
+    assignee: GroceryActor | None = None
+    claimedBy: GroceryActor | None = None
+    completedBy: GroceryActor | None = None
+    dueDate: str | None = None
+    reminderAt: str | None = None
+    recurrenceFrequency: str | None = None
+    estimatedTotal: float | None = None
+    mealType: str | None = None
+    servingsCount: int | None = None
+    monthlyUsageFrequency: int | None = None
+    selectedSuperstore: str | None = None
+    storeName: str | None = None
+    unitPriceNormalized: float | None = None
 
+    model_config = ConfigDict(extra="allow")
