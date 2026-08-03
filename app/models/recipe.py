@@ -31,6 +31,7 @@ class RecipeDetail(BaseModel):
     kcal: int = 420
     pantryMatchPercent: int = 92
     isVegetarian: bool = True
+    isFavorite: bool = False
     imageUrl: str = "https://images.unsplash.com/photo-1621996346565-e3d5d6288590?w=800&auto=format&fit=crop&q=80"
     missingCount: int = 2
     missingTotalCost: float = 6.48

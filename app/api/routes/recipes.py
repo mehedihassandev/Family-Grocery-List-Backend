@@ -123,7 +123,10 @@ AVOCADO_TOAST = RecipeDetail(
     ],
 )
 
-RECIPES_STORE: dict[str, RecipeDetail] = {}
+RECIPES_STORE: dict[str, RecipeDetail] = {
+    CREAMY_GARLIC_PASTA.id: CREAMY_GARLIC_PASTA,
+    AVOCADO_TOAST.id: AVOCADO_TOAST,
+}
 
 RECIPE_PACKS_STORE: list[RecipePack] = [
     RecipePack(
@@ -205,7 +208,9 @@ def read_recipe_detail(recipe_id: str) -> RecipeDetail:
         if doc.exists:
             data = doc.to_dict() or {}
             data.setdefault("id", doc.id)
-            return RecipeDetail.model_validate(data)
+            recipe_obj = RecipeDetail.model_validate(data)
+            RECIPES_STORE[recipe_id] = recipe_obj
+            return recipe_obj
     except Exception:
         pass
     return CREAMY_GARLIC_PASTA
@@ -221,6 +226,35 @@ def create_ai_recipe(recipe: RecipeDetail) -> RecipeDetail:
         )
     except Exception:
         pass
+    return recipe
+
+
+@router.post("/recipes/{recipe_id}/favorite", response_model=RecipeDetail)
+def toggle_favorite_recipe(recipe_id: str) -> RecipeDetail:
+    """Toggle favorite status of a recipe and save to Firestore."""
+    recipe = RECIPES_STORE.get(recipe_id)
+    if not recipe:
+        try:
+            doc = get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                data.setdefault("id", doc.id)
+                recipe = RecipeDetail.model_validate(data)
+        except Exception:
+            pass
+    if not recipe:
+        recipe = CREAMY_GARLIC_PASTA
+
+    recipe.isFavorite = not recipe.isFavorite
+    RECIPES_STORE[recipe.id] = recipe
+
+    try:
+        get_firestore_client().collection(RECIPES_COLLECTION).document(recipe.id).set(
+            recipe.model_dump()
+        )
+    except Exception:
+        pass
+
     return recipe
 
 
