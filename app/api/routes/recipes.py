@@ -213,7 +213,11 @@ def read_recipe_detail(recipe_id: str) -> RecipeDetail:
             return recipe_obj
     except Exception:
         pass
-    return CREAMY_GARLIC_PASTA
+
+    from app.services.ai import _generate_fallback_recipe, _clean_recipe_title
+    clean_prompt = recipe_id.replace("ai-", "").replace("-4p", "").replace("-2p", "").replace("-6p", "").replace("-", " ")
+    title = _clean_recipe_title(clean_prompt)
+    return _generate_fallback_recipe(title, 4, recipe_id)
 
 
 @router.post("/recipes", response_model=RecipeDetail, status_code=status.HTTP_201_CREATED)
@@ -232,19 +236,7 @@ def create_ai_recipe(recipe: RecipeDetail) -> RecipeDetail:
 @router.post("/recipes/{recipe_id}/favorite", response_model=RecipeDetail)
 def toggle_favorite_recipe(recipe_id: str) -> RecipeDetail:
     """Toggle favorite status of a recipe and save to Firestore."""
-    recipe = RECIPES_STORE.get(recipe_id)
-    if not recipe:
-        try:
-            doc = get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).get()
-            if doc.exists:
-                data = doc.to_dict() or {}
-                data.setdefault("id", doc.id)
-                recipe = RecipeDetail.model_validate(data)
-        except Exception:
-            pass
-    if not recipe:
-        recipe = CREAMY_GARLIC_PASTA
-
+    recipe = read_recipe_detail(recipe_id)
     recipe.isFavorite = not recipe.isFavorite
     RECIPES_STORE[recipe.id] = recipe
 
