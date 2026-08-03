@@ -386,7 +386,14 @@ def _clean_recipe_title(prompt: str) -> str:
     return cleaned.title() or "Custom Recipe"
 
 
-def _generate_fallback_recipe(clean_title: str, servings: int, recipe_id: str) -> RecipeDetail:
+def _generate_fallback_recipe(
+    clean_title: str,
+    servings: int,
+    recipe_id: str,
+    family_id: Optional[str] = None,
+    created_user_id: Optional[str] = None,
+    author_name: Optional[str] = "Family Chef",
+) -> RecipeDetail:
     ratio = servings / 4.0
     steps = [
         RecipeStep(
@@ -415,8 +422,8 @@ def _generate_fallback_recipe(clean_title: str, servings: int, recipe_id: str) -
             stepNumber=3,
             totalSteps=4,
             phase="Simmer",
-            title=f"Cook {clean_title} Main Base",
-            instruction=f"Add main ingredients, protein/rice, and broth. Cover pot and simmer until tender and cooked through.",
+            title="Simmer & Infuse Flavors",
+            instruction=f"Add proteins/vegetables and liquids to {clean_title}. Cover and simmer over low heat until tender and thoroughly infused.",
             timerMins=20,
             heatLevel="Low Heat",
             imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
@@ -473,6 +480,9 @@ def _generate_fallback_recipe(clean_title: str, servings: int, recipe_id: str) -
         kcal=int(450 * ratio),
         pantryMatchPercent=75,
         isVegetarian=False,
+        familyId=family_id,
+        createdUserId=created_user_id,
+        authorName=author_name or "Family Chef",
         imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
         missingCount=len([i for i in ingredients if not i.inPantry]),
         missingTotalCost=sum(i.price or 0.0 for i in ingredients if not i.inPantry),
@@ -586,6 +596,9 @@ def generate_ai_recipe(payload: GenerateAiRecipeRequest) -> RecipeDetail:
                             kcal=int(parsed.get("kcal", 500)),
                             pantryMatchPercent=int(parsed.get("pantryMatchPercent", 88)),
                             isVegetarian=bool(parsed.get("isVegetarian", False)),
+                            familyId=payload.familyId,
+                            createdUserId=payload.createdUserId,
+                            authorName=payload.authorName or "Family Chef",
                             imageUrl=parsed.get("imageUrl")
                             or "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
                             missingCount=len([i for i in ingredients if not i.inPantry]),
@@ -599,7 +612,14 @@ def generate_ai_recipe(payload: GenerateAiRecipeRequest) -> RecipeDetail:
                 continue
 
     # Fall back to high-quality local generator if API key is missing or quota/limits are exceeded
-    return _generate_fallback_recipe(clean_title, servings, recipe_id)
+    return _generate_fallback_recipe(
+        clean_title,
+        servings,
+        recipe_id,
+        family_id=payload.familyId,
+        created_user_id=payload.createdUserId,
+        author_name=payload.authorName or "Family Chef",
+    )
 
 
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,6 +22,9 @@ class RecipeToGroceryRequest(BaseModel):
 class GenerateAiRecipeRequest(BaseModel):
     recipePrompt: str
     servings: int = 4
+    familyId: Optional[str] = None
+    createdUserId: Optional[str] = None
+    authorName: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
 

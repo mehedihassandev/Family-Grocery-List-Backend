@@ -1,5 +1,5 @@
 from typing import Annotated, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import ensure_family_access, get_current_user
 from app.core.firebase import get_firestore_client
@@ -183,8 +183,8 @@ def list_recipe_packs() -> list[RecipePack]:
 
 
 @router.get("/recipes", response_model=list[RecipeDetail])
-def list_recipes() -> list[RecipeDetail]:
-    """Retrieve all available and AI-generated recipes (hardcoded + Firestore)."""
+def list_recipes(family_id: Optional[str] = Query(None)) -> list[RecipeDetail]:
+    """Retrieve all available and AI-generated recipes filtered by family_id."""
     recipes = dict(RECIPES_STORE)
     try:
         docs = get_firestore_client().collection(RECIPES_COLLECTION).stream()
@@ -194,7 +194,13 @@ def list_recipes() -> list[RecipeDetail]:
             recipes[doc.id] = RecipeDetail.model_validate(data)
     except Exception:
         pass
-    return list(recipes.values())
+
+    all_recipes = list(recipes.values())
+    if family_id:
+        # Return default global recipes (no familyId) + recipes created for this specific family
+        return [r for r in all_recipes if r.familyId is None or r.familyId == family_id]
+
+    return all_recipes
 
 
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
@@ -236,6 +242,7 @@ def create_ai_recipe(recipe: RecipeDetail) -> RecipeDetail:
 @router.post("/recipes/{recipe_id}/favorite", response_model=RecipeDetail)
 def toggle_favorite_recipe(recipe_id: str) -> RecipeDetail:
     """Toggle favorite status of a recipe and save to Firestore."""
+    print(f"[RECIPES_API] Toggling favorite for recipe_id={recipe_id}")
     recipe = read_recipe_detail(recipe_id)
     recipe.isFavorite = not recipe.isFavorite
     RECIPES_STORE[recipe.id] = recipe
@@ -244,21 +251,48 @@ def toggle_favorite_recipe(recipe_id: str) -> RecipeDetail:
         get_firestore_client().collection(RECIPES_COLLECTION).document(recipe.id).set(
             recipe.model_dump()
         )
-    except Exception:
-        pass
+        print(f"[RECIPES_API] Saved to Firestore: id={recipe.id}, isFavorite={recipe.isFavorite}")
+    except Exception as e:
+        print(f"[RECIPES_API] Firestore error: {e}")
 
     return recipe
 
 
 @router.delete("/recipes/{recipe_id}", status_code=status.HTTP_200_OK)
-def delete_recipe(recipe_id: str) -> dict[str, Any]:
-    """Delete a recipe by ID from in-memory store and Firestore."""
+def delete_recipe(
+    recipe_id: str,
+    user_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Delete a recipe by ID, enforcing author or family admin (owner) permission check."""
+    recipe = RECIPES_STORE.get(recipe_id)
+    if not recipe:
+        try:
+            doc = get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                data.setdefault("id", doc.id)
+                recipe = RecipeDetail.model_validate(data)
+        except Exception:
+            pass
+
+    if recipe and (recipe.createdUserId or recipe.familyId):
+        # Admin ("owner" / "admin") can delete any recipe; standard members can only delete their own
+        is_admin = role in ["owner", "admin"]
+        is_author = bool(user_id and recipe.createdUserId == user_id)
+        if not (is_admin or is_author):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: Only the recipe author or a family owner can delete this recipe.",
+            )
+
     if recipe_id in RECIPES_STORE:
         del RECIPES_STORE[recipe_id]
     try:
         get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).delete()
     except Exception:
         pass
+
     return {"success": True, "message": f"Recipe '{recipe_id}' deleted."}
 
 
