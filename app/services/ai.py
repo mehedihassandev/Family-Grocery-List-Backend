@@ -376,197 +376,230 @@ def _save_recipe_to_store(recipe: RecipeDetail) -> None:
         pass
 
 
-def generate_ai_recipe(payload: GenerateAiRecipeRequest) -> RecipeDetail:
-    """Generate a complete AI recipe with cooking instructions, ingredients, and step timers."""
-    settings = get_settings()
-    servings = payload.servings
-    prompt = payload.recipePrompt.strip()
-    slug = re.sub(r"[^a-z0-9]", "-", prompt.lower())[:30].strip("-") or "ai-recipe"
-    recipe_id = f"ai-{slug}-{servings}p"
+def _clean_recipe_title(prompt: str) -> str:
+    cleaned = prompt.strip()
+    cleaned = re.sub(r"(?i)^(create|make|cook|prepare|generate|how\s+to\s+make|how\s+to\s+cook|recipe\s+for)\s+", "", cleaned)
+    cleaned = re.sub(r"(?i)\s*(recipe|recepi|for\s*\d+\s*(people|persons|servings|person)?)$", "", cleaned)
+    cleaned = re.sub(r"(?i)\s*recipe\s*", " ", cleaned)
+    cleaned = re.sub(r"(?i)\s*recepi\s*", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned.title() or "Custom Recipe"
 
-    # Try Gemini AI API first if gemini_api_key is configured
-    if settings.gemini_api_key:
-        try:
-            gemini_key = settings.gemini_api_key
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:"
-                f"generateContent?key={gemini_key}"
-            )
-            prompt_text = (
-                "You are an expert AI chef. Create a detailed recipe based on the user's prompt in JSON format.\n"
-                f"Prompt: '{prompt}' for {servings} servings.\n"
-                "JSON Schema:\n"
-                "{\n"
-                '  "title": "Recipe Title",\n'
-                '  "prepTimeMins": 25,\n'
-                '  "difficulty": "Easy",\n'
-                '  "servings": 4,\n'
-                '  "kcal": 450,\n'
-                '  "pantryMatchPercent": 85,\n'
-                '  "isVegetarian": false,\n'
-                '  "imageUrl": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80",\n'
-                '  "ingredients": [\n'
-                '    {"id": "i1", "name": "Ingredient Name", "amount": "100g", "inPantry": true, "price": 2.50}\n'
-                '  ],\n'
-                '  "steps": [\n'
-                '    {\n'
-                '      "stepNumber": 1,\n'
-                '      "totalSteps": 3,\n'
-                '      "phase": "Boil",\n'
-                '      "title": "Boil water",\n'
-                '      "instruction": "Boil water for 5 minutes.",\n'
-                '      "timerMins": 5,\n'
-                '      "heatLevel": "High Heat",\n'
-                '      "imageUrl": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80",\n'
-                '      "voicePrompt": "SAY \\"NEXT\\" TO CONTINUE"\n'
-                '    }\n'
-                '  ]\n'
-                "}\n"
-                "Make sure step times (timerMins) match realistic cooking actions (e.g. boil 5 min, cook 10 min, simmer 4 min)."
-            )
-            body = {
-                "contents": [{"parts": [{"text": prompt_text}]}],
-                "generationConfig": {"response_mime_type": "application/json"},
-            }
-            with httpx.Client(timeout=10.0) as client:
-                res = client.post(url, json=body)
-                if res.status_code == 200:
-                    raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    parsed = json.loads(raw_text)
-                    steps_raw = parsed.get("steps", [])
-                    total_steps = len(steps_raw)
-                    steps = [
-                        RecipeStep(
-                            stepNumber=s.get("stepNumber", idx + 1),
-                            totalSteps=total_steps,
-                            phase=s.get("phase", "Cook"),
-                            title=s.get("title", f"Step {idx + 1}"),
-                            instruction=s.get("instruction", ""),
-                            timerMins=int(s.get("timerMins", 5)),
-                            heatLevel=s.get("heatLevel", "Medium Heat"),
-                            imageUrl=s.get("imageUrl")
-                            or "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80",
-                            voicePrompt=s.get("voicePrompt") or 'SAY "NEXT" TO CONTINUE',
-                        )
-                        for idx, s in enumerate(steps_raw)
-                    ]
-                    ingredients = [
-                        RecipeIngredient(
-                            id=i.get("id", f"i{idx + 1}"),
-                            name=i.get("name", "Ingredient"),
-                            amount=str(i.get("amount", "1 pack")),
-                            inPantry=bool(i.get("inPantry", True)),
-                            price=float(i.get("price")) if i.get("price") is not None else None,
-                        )
-                        for idx, i in enumerate(parsed.get("ingredients", []))
-                    ]
-                    recipe = RecipeDetail(
-                        id=recipe_id,
-                        title=parsed.get("title", prompt.title()),
-                        prepTimeMins=int(
-                            parsed.get("prepTimeMins", sum(s.timerMins for s in steps) or 20)
-                        ),
-                        difficulty=parsed.get("difficulty", "Easy"),
-                        servings=servings,
-                        kcal=int(parsed.get("kcal", 400)),
-                        pantryMatchPercent=int(parsed.get("pantryMatchPercent", 88)),
-                        isVegetarian=bool(parsed.get("isVegetarian", False)),
-                        imageUrl=parsed.get("imageUrl")
-                        or "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80",
-                        missingCount=len([i for i in ingredients if not i.inPantry]),
-                        missingTotalCost=sum(i.price or 0.0 for i in ingredients if not i.inPantry),
-                        ingredients=ingredients,
-                        steps=steps,
-                    )
-                    _save_recipe_to_store(recipe)
-                    return recipe
-        except Exception:
-            pass
 
-    # High quality fallback engine for dynamic AI recipe generation
-    clean_title = (
-        re.sub(r"(?i)\s*(for\s*\d+\s*(people|persons|servings)?)", "", prompt).strip().title()
-    )
-    if not clean_title:
-        clean_title = "Custom AI Recipe"
-
+def _generate_fallback_recipe(clean_title: str, servings: int, recipe_id: str) -> RecipeDetail:
+    ratio = servings / 4.0
     steps = [
         RecipeStep(
             stepNumber=1,
             totalSteps=4,
-            phase="Boil",
-            title=f"Boil water or broth for {clean_title}",
-            instruction="Bring 4 cups of salted water to a rolling boil over high heat.",
-            timerMins=5,
-            heatLevel="High Heat",
-            imageUrl="https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80",
+            phase="Prep",
+            title=f"Prepare Ingredients for {clean_title}",
+            instruction=f"Clean, chop, and measure all fresh ingredients, spices, and proteins needed for {clean_title} ({servings} servings).",
+            timerMins=10,
+            heatLevel="Low Heat",
+            imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
             voicePrompt='SAY "NEXT" TO CONTINUE',
         ),
         RecipeStep(
             stepNumber=2,
             totalSteps=4,
             phase="Cook",
-            title=f"Cook main ingredients for {clean_title}",
-            instruction=f"Add main ingredients and cook thoroughly for 10 minutes while stirring occasionally.",
-            timerMins=10,
+            title="Sauté Aromatics & Spices",
+            instruction=f"Heat oil in a heavy pot over medium heat. Sauté onions, garlic, ginger, and aromatic spices until golden brown.",
+            timerMins=8,
             heatLevel="Medium Heat",
-            imageUrl="https://images.unsplash.com/photo-1621996346565-e3d5d6288590?w=800&auto=format&fit=crop&q=80",
+            imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
             voicePrompt='SAY "NEXT" TO CONTINUE',
         ),
         RecipeStep(
             stepNumber=3,
             totalSteps=4,
             phase="Simmer",
-            title="Reduce heat and simmer sauce & spices",
-            instruction="Lower heat to gentle simmer. Cover with lid and simmer for 4 minutes to blend flavors.",
-            timerMins=4,
+            title=f"Cook {clean_title} Main Base",
+            instruction=f"Add main ingredients, protein/rice, and broth. Cover pot and simmer until tender and cooked through.",
+            timerMins=20,
             heatLevel="Low Heat",
-            imageUrl="https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80",
+            imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
             voicePrompt='SAY "NEXT" TO CONTINUE',
         ),
         RecipeStep(
             stepNumber=4,
             totalSteps=4,
-            phase="Serve",
-            title="Garnish and serve fresh",
-            instruction="Remove from heat, garnish with fresh herbs, and serve hot.",
-            timerMins=1,
+            phase="Garnish & Serve",
+            title="Final Touch & Plating",
+            instruction=f"Garnish {clean_title} with fresh cilantro, lemon slices, or fried onions. Serve hot.",
+            timerMins=2,
             heatLevel="Low Heat",
-            imageUrl="https://images.unsplash.com/photo-1621996346565-e3d5d6288590?w=800&auto=format&fit=crop&q=80",
-            voicePrompt='SAY "DONE" TO FINISH',
+            imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
+            voicePrompt='SAY "SERVE" TO FINISH',
         ),
     ]
-
     ingredients = [
         RecipeIngredient(
-            id="i1", name=f"{clean_title} Main Base", amount=f"{servings * 150}g", inPantry=True
+            id="i1",
+            name=f"{clean_title} Main Base",
+            amount=f"{round(0.8 * ratio, 1)}kg" if ratio != 1 else "600g",
+            inPantry=True,
+            price=round(450.0 * ratio, 0),
         ),
         RecipeIngredient(
-            id="i2", name="Seasoning & Spice Pack", amount="1 pack", inPantry=True
+            id="i2",
+            name="Seasoning & Spice Pack",
+            amount="1 pack",
+            inPantry=True,
+            price=round(40.0 * ratio, 0),
         ),
         RecipeIngredient(
-            id="i3", name="Fresh Herbs & Garnish", amount="1 bunch", inPantry=False, price=2.50
+            id="i3",
+            name="Fresh Herbs & Garnish",
+            amount="1 bunch",
+            inPantry=False,
+            price=round(30.0 * ratio, 0),
         ),
         RecipeIngredient(
-            id="i4", name="Cooking Oil / Butter", amount="2 tbsp", inPantry=True
+            id="i4",
+            name="Cooking Oil / Butter",
+            amount="2 tbsp",
+            inPantry=True,
+            price=round(50.0 * ratio, 0),
         ),
     ]
-
     recipe = RecipeDetail(
         id=recipe_id,
         title=clean_title,
         prepTimeMins=20,
         difficulty="Easy",
         servings=servings,
-        kcal=450,
+        kcal=int(450 * ratio),
         pantryMatchPercent=75,
         isVegetarian=False,
-        imageUrl="https://images.unsplash.com/photo-1621996346565-e3d5d6288590?w=800&auto=format&fit=crop&q=80",
-        missingCount=1,
-        missingTotalCost=2.50,
+        imageUrl="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
+        missingCount=len([i for i in ingredients if not i.inPantry]),
+        missingTotalCost=sum(i.price or 0.0 for i in ingredients if not i.inPantry),
         ingredients=ingredients,
         steps=steps,
     )
     _save_recipe_to_store(recipe)
     return recipe
+
+
+def generate_ai_recipe(payload: GenerateAiRecipeRequest) -> RecipeDetail:
+    """Generate a complete AI recipe using Google Gemini API with intelligent fallback."""
+    settings = get_settings()
+    servings = payload.servings
+    raw_prompt = payload.recipePrompt.strip()
+    clean_title = _clean_recipe_title(raw_prompt)
+    slug = re.sub(r"[^a-z0-9]", "-", clean_title.lower())[:30].strip("-") or "ai-recipe"
+    recipe_id = f"ai-{slug}-{servings}p"
+
+    gemini_key = settings.gemini_api_key.strip() if settings.gemini_api_key else ""
+
+    if gemini_key:
+        endpoints = [
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent",
+        ]
+        prompt_text = (
+            f"You are a master AI chef. Create an authentic, detailed recipe for '{clean_title}' ({servings} servings) in valid JSON format.\n"
+            "Output ONLY JSON. Do not include markdown headers or commentary.\n"
+            "JSON Schema:\n"
+            "{\n"
+            f'  "title": "{clean_title}",\n'
+            '  "prepTimeMins": 30,\n'
+            '  "difficulty": "Easy",\n'
+            f'  "servings": {servings},\n'
+            '  "kcal": 550,\n'
+            '  "pantryMatchPercent": 85,\n'
+            '  "isVegetarian": false,\n'
+            '  "imageUrl": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",\n'
+            '  "ingredients": [\n'
+            '    {"id": "i1", "name": "Ingredient Name", "amount": "100g", "inPantry": true, "price": 2.50}\n'
+            '  ],\n'
+            '  "steps": [\n'
+            '    {\n'
+            '      "stepNumber": 1,\n'
+            '      "totalSteps": 4,\n'
+            '      "phase": "Prep",\n'
+            '      "title": "Detailed Step Title",\n'
+            '      "instruction": "Full authentic instruction describing how to cook this dish.",\n'
+            '      "timerMins": 10,\n'
+            '      "heatLevel": "High Heat",\n'
+            '      "imageUrl": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",\n'
+            '      "voicePrompt": "SAY \\"NEXT\\" TO CONTINUE"\n'
+            '    }\n'
+            '  ]\n'
+            "}\n"
+            "Ensure every step title and instruction specifically relates to cooking " + clean_title + "."
+        )
+        body = {
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "generationConfig": {"response_mime_type": "application/json"},
+        }
+
+        for endpoint_base in endpoints:
+            try:
+                url = f"{endpoint_base}?key={gemini_key}"
+                with httpx.Client(timeout=15.0) as client:
+                    res = client.post(url, json=body)
+                    if res.status_code == 200:
+                        raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        raw_text = re.sub(r"^```(json)?\s*", "", raw_text, flags=re.MULTILINE)
+                        raw_text = re.sub(r"\s*```$", "", raw_text, flags=re.MULTILINE).strip()
+
+                        parsed = json.loads(raw_text)
+                        steps_raw = parsed.get("steps", [])
+                        total_steps = len(steps_raw)
+                        steps = [
+                            RecipeStep(
+                                stepNumber=s.get("stepNumber", idx + 1),
+                                totalSteps=total_steps,
+                                phase=s.get("phase", "Cook"),
+                                title=s.get("title", f"Step {idx + 1}"),
+                                instruction=s.get("instruction", ""),
+                                timerMins=int(s.get("timerMins", 5)),
+                                heatLevel=s.get("heatLevel", "Medium Heat"),
+                                imageUrl=s.get("imageUrl")
+                                or "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
+                                voicePrompt=s.get("voicePrompt") or 'SAY "NEXT" TO CONTINUE',
+                            )
+                            for idx, s in enumerate(steps_raw)
+                        ]
+                        ingredients = [
+                            RecipeIngredient(
+                                id=i.get("id", f"i{idx + 1}"),
+                                name=i.get("name", "Ingredient"),
+                                amount=str(i.get("amount", "1 pack")),
+                                inPantry=bool(i.get("inPantry", True)),
+                                price=float(i.get("price")) if i.get("price") is not None else None,
+                            )
+                            for idx, i in enumerate(parsed.get("ingredients", []))
+                        ]
+                        recipe = RecipeDetail(
+                            id=recipe_id,
+                            title=_clean_recipe_title(parsed.get("title", clean_title)),
+                            prepTimeMins=int(
+                                parsed.get("prepTimeMins", sum(s.timerMins for s in steps) or 25)
+                            ),
+                            difficulty=parsed.get("difficulty", "Easy"),
+                            servings=servings,
+                            kcal=int(parsed.get("kcal", 500)),
+                            pantryMatchPercent=int(parsed.get("pantryMatchPercent", 88)),
+                            isVegetarian=bool(parsed.get("isVegetarian", False)),
+                            imageUrl=parsed.get("imageUrl")
+                            or "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80",
+                            missingCount=len([i for i in ingredients if not i.inPantry]),
+                            missingTotalCost=sum(i.price or 0.0 for i in ingredients if not i.inPantry),
+                            ingredients=ingredients,
+                            steps=steps,
+                        )
+                        _save_recipe_to_store(recipe)
+                        return recipe
+            except Exception:
+                continue
+
+    # Fall back to high-quality local generator if API key is missing or quota/limits are exceeded
+    return _generate_fallback_recipe(clean_title, servings, recipe_id)
+
+
 

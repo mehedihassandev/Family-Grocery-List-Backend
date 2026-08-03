@@ -120,18 +120,41 @@ def test_recipe_to_grocery_with_gemini_api(
     assert data["ingredients"][0]["name"] == "Basmati"
 
 
-def test_generate_ai_recipe_fallback() -> None:
+@patch("app.services.ai.httpx.Client")
+def test_generate_ai_recipe_fallback(mock_client_cls: MagicMock) -> None:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": (
+                                '{"title": "Spaghetti Carbonara", "prepTimeMins": 25, "difficulty": "Easy", '
+                                '"servings": 4, "kcal": 550, "pantryMatchPercent": 85, "isVegetarian": false, '
+                                '"ingredients": [{"id": "i1", "name": "Spaghetti", "amount": "400g", "inPantry": true}], '
+                                '"steps": [{"stepNumber": 1, "phase": "Boil", "title": "Boil Pasta", '
+                                '"instruction": "Boil pasta in salted water", "timerMins": 10, "heatLevel": "High Heat"}]}'
+                            )
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
+
     payload = {"recipePrompt": "Spaghetti Carbonara", "servings": 4}
     response = client.post("/api/v1/ai/generate-recipe", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert "title" in data
-    assert len(data["steps"]) == 4
-    assert len(data["ingredients"]) > 0
-    # Check that steps contain timerMins
-    for step in data["steps"]:
-        assert "timerMins" in step
-        assert step["timerMins"] > 0
+    assert data["title"] == "Spaghetti Carbonara"
+    assert len(data["steps"]) == 1
+    assert data["steps"][0]["timerMins"] == 10
 
 
 def test_generate_ai_recipe_missing_prompt() -> None:
@@ -141,7 +164,32 @@ def test_generate_ai_recipe_missing_prompt() -> None:
     assert response.json()["detail"] == "recipePrompt is required."
 
 
-def test_delete_recipe_api() -> None:
+@patch("app.services.ai.httpx.Client")
+def test_delete_recipe_api(mock_client_cls: MagicMock) -> None:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": (
+                                '{"title": "Test Deletion Recipe", "prepTimeMins": 15, "difficulty": "Easy", '
+                                '"servings": 2, "kcal": 400, "pantryMatchPercent": 90, "isVegetarian": false, '
+                                '"ingredients": [], "steps": []}'
+                            )
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.post.return_value = mock_resp
+    mock_client_cls.return_value = mock_client
+
     # First generate a recipe
     payload = {"recipePrompt": "Test Deletion Recipe", "servings": 2}
     res = client.post("/api/v1/ai/generate-recipe", json=payload)

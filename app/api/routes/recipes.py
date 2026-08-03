@@ -123,10 +123,7 @@ AVOCADO_TOAST = RecipeDetail(
     ],
 )
 
-RECIPES_STORE: dict[str, RecipeDetail] = {
-    CREAMY_GARLIC_PASTA.id: CREAMY_GARLIC_PASTA,
-    AVOCADO_TOAST.id: AVOCADO_TOAST,
-}
+RECIPES_STORE: dict[str, RecipeDetail] = {}
 
 RECIPE_PACKS_STORE: list[RecipePack] = [
     RecipePack(
