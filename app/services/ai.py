@@ -5,14 +5,6 @@ from typing import Optional
 import httpx
 
 from app.core.config import get_settings
-from app.models.ai import (
-    GenerateAiRecipeRequest,
-    MonthlyInsightsRequest,
-    MonthlyInsightsResponse,
-    RecipeIngredient as AiRecipeIngredient,
-    RecipeToGroceryRequest,
-    RecipeToGroceryResponse,
-)
 from app.models.recipe import RecipeDetail, RecipeIngredient, RecipeStep
 
 

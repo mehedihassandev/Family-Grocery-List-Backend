@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import ai, family, grocery, health, notification, superstores, user, recipes
+from app.api.routes import family, grocery, health, notification, recipes, superstores, user
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -11,13 +11,12 @@ api_router.include_router(family.router, prefix="/v1", tags=["family"])
 api_router.include_router(grocery.router, prefix="/v1", tags=["grocery"])
 api_router.include_router(notification.router, prefix="/v1", tags=["notifications"])
 api_router.include_router(superstores.router, prefix="/v1", tags=["superstores"])
-api_router.include_router(ai.router, prefix="/v1", tags=["ai"])
 api_router.include_router(recipes.router, prefix="/v1", tags=["recipes"])
-# Backward compatibility alias for /api/v1 routes (hidden from OpenAPI schema to prevent Swagger duplication)
+
+# Backward compatibility alias for /api/v1 routes
 api_router.include_router(user.router, prefix="/api/v1", include_in_schema=False)
 api_router.include_router(family.router, prefix="/api/v1", include_in_schema=False)
 api_router.include_router(grocery.router, prefix="/api/v1", include_in_schema=False)
 api_router.include_router(notification.router, prefix="/api/v1", include_in_schema=False)
 api_router.include_router(superstores.router, prefix="/api/v1", include_in_schema=False)
-api_router.include_router(ai.router, prefix="/api/v1", include_in_schema=False)
 api_router.include_router(recipes.router, prefix="/api/v1", include_in_schema=False)
