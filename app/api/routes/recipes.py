@@ -217,14 +217,27 @@ def read_recipe_detail(recipe_id: str) -> RecipeDetail:
 @router.post("/recipes", response_model=RecipeDetail, status_code=status.HTTP_201_CREATED)
 def create_ai_recipe(recipe: RecipeDetail) -> RecipeDetail:
     """Save an AI-generated recipe to Firestore."""
+    RECIPES_STORE[recipe.id] = recipe
     try:
         get_firestore_client().collection(RECIPES_COLLECTION).document(recipe.id).set(
             recipe.model_dump()
         )
     except Exception:
-        # Fallback: keep in-memory so the API still works
-        RECIPES_STORE[recipe.id] = recipe
+        pass
     return recipe
+
+
+@router.delete("/recipes/{recipe_id}", status_code=status.HTTP_200_OK)
+def delete_recipe(recipe_id: str) -> dict[str, Any]:
+    """Delete a recipe by ID from in-memory store and Firestore."""
+    if recipe_id in RECIPES_STORE:
+        del RECIPES_STORE[recipe_id]
+    try:
+        get_firestore_client().collection(RECIPES_COLLECTION).document(recipe_id).delete()
+    except Exception:
+        pass
+    return {"success": True, "message": f"Recipe '{recipe_id}' deleted."}
+
 
 
 @router.post(

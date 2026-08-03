@@ -19,6 +19,14 @@ class RecipeToGroceryRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class GenerateAiRecipeRequest(BaseModel):
+    recipePrompt: str
+    servings: int = 4
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+
 class RecipeToGroceryResponse(BaseModel):
     recipeName: str
     servings: int

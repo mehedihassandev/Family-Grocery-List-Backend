@@ -118,3 +118,38 @@ def test_recipe_to_grocery_with_gemini_api(
     data = response.json()
     assert data["recipeName"] == "Gemini Tehari"
     assert data["ingredients"][0]["name"] == "Basmati"
+
+
+def test_generate_ai_recipe_fallback() -> None:
+    payload = {"recipePrompt": "Spaghetti Carbonara", "servings": 4}
+    response = client.post("/api/v1/ai/generate-recipe", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "title" in data
+    assert len(data["steps"]) == 4
+    assert len(data["ingredients"]) > 0
+    # Check that steps contain timerMins
+    for step in data["steps"]:
+        assert "timerMins" in step
+        assert step["timerMins"] > 0
+
+
+def test_generate_ai_recipe_missing_prompt() -> None:
+    payload = {"recipePrompt": "   ", "servings": 4}
+    response = client.post("/api/v1/ai/generate-recipe", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "recipePrompt is required."
+
+
+def test_delete_recipe_api() -> None:
+    # First generate a recipe
+    payload = {"recipePrompt": "Test Deletion Recipe", "servings": 2}
+    res = client.post("/api/v1/ai/generate-recipe", json=payload)
+    recipe_id = res.json()["id"]
+
+    # Delete the recipe
+    del_res = client.delete(f"/api/v1/recipes/{recipe_id}")
+    assert del_res.status_code == 200
+    assert del_res.json()["success"] is True
+
+
